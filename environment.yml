@@ -1,0 +1,12 @@
+name: telegram-bot-template
+channels:
+  - defaults
+  - conda-forge
+dependencies:
+  - python=3.12
+  - pip
+  - pip:
+      - python-telegram-bot
+      - python-dotenv
+      - openai
+      - aiosqlite
