@@ -1,5 +1,4 @@
 import asyncio
-import os
 from dotenv import load_dotenv
 from bot.utils.logger import logger
 from bot.bot import telegram_bot
@@ -8,7 +7,7 @@ from bot.config import config  # Importamos la instancia
 
 
 async def main():
-    main_logger = logger.get_logger("main")
+    main_logger = logger.get_logger("al-grano-bot.main")
     try:
         # Load environment variables
         load_dotenv()
