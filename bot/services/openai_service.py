@@ -192,7 +192,7 @@ class OpenAIService:
     async def get_summary(
         self,
         content: str,
-        summary_type: Literal["chat", "video", "general"],
+        summary_type: Literal["youtube", "video", "audio", "general", "web"],
         language: str = "Spanish"
     ) -> str:
         """Get summary based on content type and language"""
