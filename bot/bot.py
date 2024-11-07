@@ -1,4 +1,3 @@
-from telegram import Update
 from telegram.ext import (
     Application,
     ApplicationBuilder,
@@ -32,7 +31,7 @@ class TelegramBot:
         """Initialize the Telegram bot"""
         if not self.initialized:
             self.token = token
-            self.logger = logger.get_logger("telegram_bot")
+            self.logger = logger.get_logger(__name__)
 
             if openai_api_key:
                 openai_service.initialize(openai_api_key)
@@ -90,4 +89,4 @@ class TelegramBot:
             self.logger.info("Bot stopped successfully")
 
 
-telegram_bot = TelegramBot()  # Single instance
+telegram_bot = TelegramBot()
