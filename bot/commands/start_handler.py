@@ -1,8 +1,8 @@
 from telegram import Update, ParseMode
 from telegram.ext import CallbackContext
-from bot.services import db_service
-from bot.utils.decorators import log_command, rate_limit
-from bot.utils.logger import logger
+from services import db_service
+from utils.decorators import log_command, rate_limit
+from utils.logger import logger
 
 logger = logger.get_logger(__name__)
 

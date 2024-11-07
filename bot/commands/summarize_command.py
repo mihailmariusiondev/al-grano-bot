@@ -1,10 +1,9 @@
-import random
 from telegram.ext import CallbackContext
 from telegram import Update
-from bot.utils.decorators import admin_command, premium_only, log_command, bot_started
-from bot.utils.format_utils import format_recent_messages
-from bot.utils.logger import logger
-from bot.services.database_service import db_service
+from utils.decorators import admin_command, log_command, bot_started, rate_limit
+from utils.format_utils import format_recent_messages
+from utils.logger import logger
+from services import db_service
 
 WAIT_FOR_SUMMARY_REPLIES = [
     'Espérate un segundo, crack, que te lo resumo en un plis. No te me impacientes, coño.',
@@ -58,6 +57,7 @@ logger = logger.get_logger(__name__)
 @admin_command()
 @log_command()
 @bot_started()
+@rate_limit(10)
 async def summarize_command(update: Update, context: CallbackContext):
     # TODO: Implement summarize command
     pass

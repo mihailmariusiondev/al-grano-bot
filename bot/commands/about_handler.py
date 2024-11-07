@@ -1,7 +1,7 @@
 from telegram import Update
 from telegram.ext import ContextTypes
-from ..utils.logger import logger
-from ..utils.decorators import rate_limit, log_command, bot_started
+from utils.logger import logger
+from utils.decorators import rate_limit, log_command, bot_started
 
 ABOUT_MESSAGE = (
     "Bot creado por @Arkantos2374 con ❤️.\n\n"

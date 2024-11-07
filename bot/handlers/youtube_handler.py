@@ -1,3 +1,4 @@
+import re
 from telegram import Update
 from telegram.ext import CallbackContext
 from youtube_transcript_api import (
@@ -5,61 +6,63 @@ from youtube_transcript_api import (
     NoTranscriptFound,
     VideoUnavailable,
 )
-
 import logging
-import re
-from ..utils.constants import YOUTUBE_REGEX
-from bot.utils.logger import logger
 
-logger = logger.get_logger(__name__)
+from bot.utils.constants import YOUTUBE_REGEX
+
+logging = logging.getLogger(__name__)
 
 async def youtube_handler(
-    update: Update, context: CallbackContext, youtube_url: str, original_message
+    update: Update, context: CallbackContext, youtube_url: str
 ) -> None:
-    # Extract the video ID from the YouTube URL
-    video_id = extract_video_id(youtube_url)
-    if not video_id:
-        await update.message.chat.send_message(
-            "No se pudo procesar debido a problemas con el enlace proporcionado."
-        )
-        return
+    """
+    Handle YouTube video transcription requests.
 
-    logging.info(f"ID del video a transcribir: {video_id}")
-    await update.message.chat.send_message(
-        "Procesando la transcripción del video de YouTube, por favor espera..."
-    )
+    Args:
+        update: Telegram update object
+        context: Callback context
+        youtube_url: URL of the YouTube video
+    """
+    user_id = update.effective_user.id
+
+    # Extract video ID
+    video_id = extract_video_id(youtube_url)
+
+    logging.info(f"Processing YouTube video {video_id} for user {user_id}")
 
     try:
-        # Get the list of available transcripts for the video
+        # Get available transcripts
         transcript_list = YouTubeTranscriptApi.list_transcripts(video_id)
+        logging.info(
+            f"Available transcripts for video {video_id}: {[t.language_code for t in transcript_list]}"
+        )
 
-        # Prefer English transcript, fallback to the first available language
+        # Try to get English transcript first, fall back to first available
         transcript = next(
             (t for t in transcript_list if t.language_code == "en"),
             next(iter(transcript_list)),
         )
+        logging.info(f"Selected transcript language: {transcript.language_code}")
 
-        # Fetch the transcript data
+        # Fetch and process transcript
         transcript_data = transcript.fetch()
-
-        # Process the transcript into a single string
         transcription = " ".join([entry["text"] for entry in transcript_data])
+        logging.info(f"Transcription fetched, length: {len(transcription)} chars")
 
         return transcription
 
     except NoTranscriptFound:
-        # Handle case where no transcript is available
+        logging.warning(f"No transcripts available for video {video_id}")
         await update.message.chat.send_message(
             "El video no tiene subtítulos disponibles."
         )
     except VideoUnavailable:
-        # Handle case where the video is unavailable
+        logging.error(f"Video {video_id} is unavailable")
         await update.message.chat.send_message(
             "No se pudo procesar debido a problemas con el enlace proporcionado."
         )
     except Exception as e:
-        # Log and handle any unexpected errors
-        logging.error(f"Error inesperado: {e}")
+        logging.error(f"Error processing YouTube video {video_id}: {str(e)}")
         await update.message.chat.send_message(
             "Ocurrió un error inesperado al procesar la transcripción."
         )
