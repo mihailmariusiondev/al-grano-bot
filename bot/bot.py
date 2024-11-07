@@ -6,10 +6,12 @@ from telegram.ext import (
     filters,
 )
 from typing import Optional
-from .handlers import (
+from .commands import (
     start_handler,
     help_handler,
     about_handler,
+)
+from .handlers import (
     error_handler,
     message_handler,
 )

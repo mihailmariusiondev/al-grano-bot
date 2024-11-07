@@ -11,3 +11,4 @@ dependencies:
       - openai
       - aiosqlite
       - youtube-transcript-api
+      - python-readability
