@@ -1,7 +1,7 @@
 import random
 from telegram.ext import CallbackContext
 from telegram import Update
-from bot.utils.decorators import premium_only, log_command, bot_started
+from bot.utils.decorators import admin_command, premium_only, log_command, bot_started
 from bot.utils.format_utils import format_recent_messages
 from bot.utils.logger import logger
 from bot.services.database_service import db_service
@@ -55,82 +55,9 @@ ERROR_MESSAGES = {
 
 logger = logger.get_logger(__name__)
 
-@premium_only()
+@admin_command()
 @log_command()
 @bot_started()
 async def summarize_command(update: Update, context: CallbackContext):
-    logger.debug('Comando /summarize iniciado')
-    try:
-        chat_id = update.effective_chat.id
-        if not chat_id:
-            return
-
-        wait_message_text = random.choice(WAIT_FOR_SUMMARY_REPLIES)
-        wait_message = await update.message.reply_text(wait_message_text)
-
-        current_time = int(update.message.date.timestamp() * 1000)
-        await db_service.update_chat_state(chat_id, {'last_command_usage': current_time})
-        logger.info(f"Tiempo de último uso del comando actualizado para chat_id: {chat_id}")
-
-        summary = ''
-        original_message = None
-
-        if not update.message.reply_to_message:
-            logger.debug('No se encontró respuesta. Resumiendo mensajes recientes')
-            summary = summarize_recent_chat_messages(chat_id, update, context)
-        else:
-            replied_message = update.message.reply_to_message
-            if replied_message.text:
-                summary = summarize_replied_message(replied_message.text)
-                original_message = replied_message
-            elif replied_message.voice:
-                summary = summarize_audio_message(update, context, replied_message.voice.file_id)
-                original_message = replied_message
-            else:
-                logger.debug('Respuesta inválida')
-                update.message.reply_text('Respuesta inválida. Por favor, responde a un mensaje de texto, un enlace válido de YouTube o un mensaje de voz.')
-                return
-
-        logger.debug(f"Resumen: {summary}")
-
-        context.bot.delete_message(chat_id=wait_message.chat_id, message_id=wait_message.message_id)
-
-        if original_message:
-            update.message.reply_text(summary, reply_to_message_id=original_message.message_id)
-        else:
-            update.message.reply_text(summary)
-
-    except Exception as e:
-        logger.error(f"Error en summarize_command: {e}")
-        raise e
-
-async def summarize_recent_chat_messages(chat_id, update, context):
-    logger.debug('Resumiendo los últimos 300 mensajes.')
-    recent_messages = await db_service.get_recent_messages(chat_id, 300)
-    logger.debug(f"Cantidad de mensajes recientes: {len(recent_messages)}")
-    if len(recent_messages) < 5:
-        logger.debug('No hay suficientes mensajes.')
-        await update.message.reply_text(ERROR_MESSAGES['NOT_ENOUGH_MESSAGES'])
-        return ''
-    formatted_messages = format_recent_messages(recent_messages)
-    summary = get_summary_chat_content(formatted_messages, bot_config['LANGUAGE'])
-    return summary
-
-def summarize_replied_message(replied_text):
-    logger.debug('Resumiendo mensaje de texto respondido.')
-    summary = get_summary_general_content(replied_text, bot_config['LANGUAGE'])
-    return summary
-
-def summarize_audio_message(update, context, voice_file_id):
-    try:
-        file = context.bot.get_file(voice_file_id)
-        input_file_path = download_audio_file(file.file_path, voice_file_id)
-        output_file_path = process_audio_file(input_file_path, voice_file_id)
-        transcript_text = transcribe_audio_file(output_file_path)
-        logger.debug(f"Transcripción: {transcript_text}")
-        summary_text = get_summary_general_content(transcript_text, bot_config['LANGUAGE'])
-        delete_audio_files([input_file_path, output_file_path])
-        return summary_text
-    except Exception as e:
-        logger.error(f"Error en summarize_audio_message: {e}")
-        return ERROR_MESSAGES['ERROR_SUMMARIZING']
+    # TODO: Implement summarize command
+    pass

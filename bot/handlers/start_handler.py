@@ -7,16 +7,10 @@ from bot.utils.logger import logger
 logger = logger.get_logger(__name__)
 
 START_MESSAGE = (
-        "¡Eeeeeeh, figura! Soy el puto amo resumiendo mierdas. Si quieres flipar con lo que sé hacer, presta atención:\n"
-        "- Escribe /summarize sin responder a ningún mensaje y te resumo los últimos 300 mensajes de este puto chat. Así no se te escapa ni una, crack.\n"
-        "- Responde a un mensaje con /summarize y te lo resumo en un plis, sin mariconadas. Voy al grano, como tiene que ser.\n"
-        "- Responde a un mensaje con un enlace de YouTube y escribe /summarize. Te hago un resumen del puto video que flipas. Soy la hostia, ¿eh?\n"
-        "Así que ya sabes, si no quieres andar perdido como un gilipollas, escríbeme /summarize y te pongo al día en un momento.\n"
-        "Si no te enteras de una mierda, escribe /help y te lo explico, tontaina. ¡Vamos a darle caña a esto, coño!\n"
-        "Este pedazo de bot lo ha creado el crack de @Arkantos2374. El muy cabrón se pulsa todos los costes de hosting y de las APIs de su puto bolsillo, así que si te molo y quieres que siga currando como un hijo de puta, cualquier donativo me vendría de puta madre. Si te sale de los cojones, puedes donar en paypal.me/mariusmihailion. ¡Gracias, puto amo!"
-    )
+    "¡Eeeeeeh, figura! Bienvenido/a al puto bot de resumen de mierdas. Soy el puto amo resumiendo tus mierdas."
+)
 
-@rate_limit(60)
+@rate_limit(30)
 @log_command()
 async def start_handler(update: Update, context: CallbackContext):
     try:
