@@ -59,5 +59,6 @@ logger = logger.get_logger(__name__)
 @bot_started()
 @rate_limit(10)
 async def summarize_command(update: Update, context: CallbackContext):
-    # TODO: Implement summarize command
+    # TODO: Implement summarize command for all:
+    # "chat", "youtube", "telegram_video", "voice_message", "audio_file", "quoted_message", "web_article"
     pass
