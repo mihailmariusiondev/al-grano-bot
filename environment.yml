@@ -10,3 +10,4 @@ dependencies:
       - python-dotenv
       - openai
       - aiosqlite
+      - youtube-transcript-api

@@ -1,13 +1,10 @@
-from .start_handler import start_handler
-from .help_handler import help_handler
-from .about_handler import about_handler
-from .error_handler import error_handler
-from .message_handler import message_handler
-
-__all__ = [
-    "start_handler",
-    "help_handler",
-    "about_handler",
-    "error_handler",
-    "message_handler",
-]
+from .about_handler import *
+from .admin_handler import *
+from .audio_handler import *
+from .error_handler import *
+from .help_handler import *
+from .message_handler import *
+from .start_handler import *
+from .summarize_command import *
+from .video_handler import *
+from .youtube_handler import *

@@ -1,7 +1,7 @@
 from telegram import Update
 from telegram.ext import ContextTypes
 from ..utils.logger import logger
-from ..utils import rate_limit
+from ..utils.decorators import rate_limit
 
 logger = logger.get_logger("handlers.about")
 
