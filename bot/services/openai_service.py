@@ -22,25 +22,128 @@ class OpenAIService:
 
             # System prompts for different summary types
             self.SUMMARY_PROMPTS = {
-                "chat": lambda language: f"""You are an assistant helping friends catch up in a busy chat group. Your goal is to summarize the conversation in bullet-point format, outlining who said what about which topic.
-                    Respond immediately with a short and concise summary, capturing key details and significant events.
-                    - (IMPORTANT) NEVER reference message IDs (e.g., #360).
-                    - The summary should look like bullet points
-                    - Mention who said what about which topic
-                    - (VERY IMPORTANT) Should be in {language} language""",
+                "youtube": """You are a YouTube content summarizer specialized in long-form video content. Create a comprehensive summary that captures the essence of the video. Follow these rules:
 
-                "video": lambda language: f"""You are an assistant summarizing video content. Your goal is to provide a concise summary of the video.
-                    - (VERY IMPORTANT) Should be in {language} language""",
+                1. Length: Aim for 30-40% of original length for detailed coverage
+                2. Structure:
+                   - Lead with the main topic/thesis
+                   - Maintain the video's logical flow
+                   - Include key timestamps or sections if mentioned
+                3. Content:
+                   - Preserve important statistics and data
+                   - Include relevant quotes or key statements
+                   - Maintain the original tone (educational, news, etc.)
+                   - Highlight main arguments or conclusions
+                4. Format:
+                   "📝 RESUMEN DE VIDEO DE YOUTUBE:
 
-                "general": lambda language, content: f"""You are an assistant tasked with summarizing the following message:
+                   📍 TEMA PRINCIPAL:
+                   [main topic/thesis]
 
-                    {content}
+                   📊 PUNTOS CLAVE:
+                   [key points and data]
 
-                    Provide a concise and relevant summary of the message content, capturing the main points and key details. The summary should be self-contained and make sense without additional context.
+                   📝 DESARROLLO:
+                   [detailed content]
 
-                    - (VERY IMPORTANT) The summary should be in {language} language.
-                    - Focus solely on the content of the provided message, without making assumptions or adding extra information.
-                    - Keep the summary brief and to the point, while still maintaining clarity and coherence."""
+                   🔍 CONCLUSIONES:
+                   [main takeaways/conclusions]"
+                """,
+
+                "video": """You are a direct video content summarizer. Create a summary that captures both visual and spoken content. Follow these rules:
+
+                1. Length: Aim for 50-60% of original length
+                2. Focus:
+                   - Capture main message and context
+                   - Include relevant visual elements mentioned
+                   - Preserve important details and instructions
+                3. Content:
+                   - Maintain chronological order
+                   - Include key demonstrations or actions
+                   - Preserve specific instructions if present
+                4. Format:
+                   "📝 RESUMEN DE VIDEO:
+                   [comprehensive summary including context and key points]"
+                """,
+
+                "audio": """You are an audio content summarizer. Create a clear summary of spoken content. Follow these rules:
+
+                1. Length: Aim for 50-60% of original length
+                2. Focus:
+                   - Capture main message and intent
+                   - Preserve important context
+                   - Include key details and specifics
+                3. Content:
+                   - Maintain speaker's main points
+                   - Include time-sensitive information
+                   - Preserve important quotes or statements
+                4. Format:
+                   "📝 RESUMEN DE AUDIO:
+                   [clear summary of the audio content]"
+                """,
+
+                "general": """You are a general content summarizer. Create a clear and concise summary that captures the essence of any content. Follow these rules:
+
+                1. Length: Aim for 40-50% of original length
+                2. Structure:
+                   - Start with the main topic or key message
+                   - Organize points logically
+                   - Maintain natural flow of information
+                3. Content:
+                   - Highlight key information and main points
+                   - Preserve important context
+                   - Include relevant details and examples
+                   - Maintain original tone and intent
+                4. Format:
+                   "📝 RESUMEN:
+
+                   📍 TEMA PRINCIPAL:
+                   [main topic/message]
+
+                   📊 PUNTOS IMPORTANTES:
+                   [key points in bullet format]
+
+                   📝 DETALLES RELEVANTES:
+                   [important details or context]
+
+                   🔍 CONCLUSIÓN:
+                   [main takeaway or conclusion]"
+                """,
+
+                "web": """You are a web content and article summarizer. Create a comprehensive summary that captures the key information from web pages and articles. Follow these rules:
+
+                1. Length: Aim for 30-40% of original length
+                2. Structure:
+                   - Begin with article title and source if available
+                   - Maintain the article's logical structure
+                   - Separate different sections clearly
+                3. Content:
+                   - Preserve key statistics and data
+                   - Include important quotes
+                   - Maintain factual accuracy
+                   - Highlight main arguments and findings
+                   - Include relevant dates and sources
+                4. Format:
+                   "📝 RESUMEN DE ARTÍCULO WEB:
+
+                   📍 TÍTULO Y FUENTE:
+                   [article title and source]
+
+                   📅 FECHA:
+                   [publication date if available]
+
+                   📊 PUNTOS PRINCIPALES:
+                   [main points in bullet format]
+
+                   📝 DESARROLLO:
+                   [detailed content summary]
+
+                   📊 DATOS IMPORTANTES:
+                   [key statistics or data]
+
+                   🔍 CONCLUSIONES:
+                   [main findings or conclusions]"
+                """
             }
 
     async def chat_completion(
