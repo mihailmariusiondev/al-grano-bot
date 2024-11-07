@@ -10,6 +10,7 @@ from .commands import (
     start_handler,
     help_handler,
     about_handler,
+    summarize_command,
 )
 from .handlers import (
     error_handler,
@@ -50,6 +51,7 @@ class TelegramBot:
         self.application.add_handler(CommandHandler("start", start_handler))
         self.application.add_handler(CommandHandler("help", help_handler))
         self.application.add_handler(CommandHandler("about", about_handler))
+        self.application.add_handler(CommandHandler("summarize", summarize_command))
         self.application.add_handler(
             MessageHandler(filters.TEXT & ~filters.COMMAND, message_handler)
         )
