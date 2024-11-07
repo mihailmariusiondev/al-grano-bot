@@ -3,7 +3,7 @@ from telegram.ext import ContextTypes
 from ..utils.logger import logger
 from ..utils.decorators import rate_limit
 
-logger = logger.get_logger("handlers.about")
+logger = logger.get_logger(__name__)
 
 
 @rate_limit(30)  # Limitar uso cada 30 segundos

@@ -10,7 +10,9 @@ from ..utils.media_utils import (
 )
 from ..services.openai_service import openai_service
 from ..utils.constants import MAX_FILE_SIZE
+from bot.utils.logger import logger
 
+logger = logger.get_logger(__name__)
 
 async def video_handler(message: Message, context: CallbackContext) -> None:
     # Check if the video file size exceeds the maximum allowed size

@@ -9,7 +9,9 @@ from youtube_transcript_api import (
 import logging
 import re
 from ..utils.constants import YOUTUBE_REGEX
+from bot.utils.logger import logger
 
+logger = logger.get_logger(__name__)
 
 async def youtube_handler(
     update: Update, context: CallbackContext, youtube_url: str, original_message

@@ -3,7 +3,7 @@ from telegram.ext import ContextTypes
 from ..utils.logger import logger
 from ..config import config
 
-logger = logger.get_logger("handlers.help")
+logger = logger.get_logger(__name__)
 
 
 async def help_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):

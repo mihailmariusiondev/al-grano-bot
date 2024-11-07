@@ -4,7 +4,7 @@ from ..utils.decorators import admin_command
 from ..utils.logger import logger
 from ..services.database_service import db_service
 
-logger = logger.get_logger("handlers.admin")
+logger = logger.get_logger(__name__)
 
 @admin_command
 async def stats_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):

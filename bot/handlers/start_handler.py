@@ -4,7 +4,7 @@ from ..utils.logger import logger
 from ..services import db_service
 from ..utils.decorators import rate_limit
 
-logger = logger.get_logger("handlers.start")
+logger = logger.get_logger(__name__)
 
 
 @rate_limit(60)  # Evitar spam del comando start

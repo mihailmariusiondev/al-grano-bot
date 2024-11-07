@@ -11,7 +11,9 @@ import tempfile
 import os
 import mimetypes
 import logging
+from bot.utils.logger import logger
 
+logger = logger.get_logger(__name__)
 
 async def audio_handler(message: Message, context: CallbackContext) -> None:
     # Determine the file size based on whether it's an audio or voice message

@@ -3,7 +3,7 @@ from telegram import Update
 from telegram.ext import ContextTypes
 from ..utils.logger import logger
 
-logger = logger.get_logger("handlers.error")
+logger = logger.get_logger(__name__)
 
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle errors in the telegram bot"""
