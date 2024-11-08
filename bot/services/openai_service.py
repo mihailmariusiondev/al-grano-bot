@@ -154,7 +154,22 @@ class OpenAIService:
                    [key points in bullet format]
                    💡 CONCLUSIONES:
                    [main conclusions]"
-                - (VERY IMPORTANT) Should be in Spanish from Spain"""
+                - (VERY IMPORTANT) Should be in Spanish from Spain""",
+
+
+                "document": """You are a document summarizer. Create a clear and structured summary of the document content.
+                Format:
+                📄 RESUMEN DE DOCUMENTO:
+                [comprehensive summary including context and key points]
+                - (VERY IMPORTANT) Should be in Spanish from Spain""",
+
+
+                "poll": """You are a poll summarizer. Summarize the poll question and options clearly.
+                Format:
+                📊 RESUMEN DE ENCUESTA:
+                ❓ Pregunta: [poll question]
+                📍 Opciones: [formatted options]
+                - (VERY IMPORTANT) Should be in Spanish from Spain""",
             }
 
     async def chat_completion(
@@ -203,7 +218,7 @@ class OpenAIService:
     async def get_summary(
         self,
         content: str,
-        summary_type: Literal["chat", "youtube", "telegram_video", "voice_message", "audio_file", "quoted_message", "web_article"],
+        summary_type: Literal["chat", "youtube", "telegram_video", "voice_message", "audio_file", "quoted_message", "web_article", "document", "poll"],
         language: str = "Spanish"
     ) -> str:
         """Get summary based on content type and language"""

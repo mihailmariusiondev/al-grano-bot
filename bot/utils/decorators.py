@@ -86,6 +86,30 @@ def rate_limit(seconds: int):
         return wrapped
     return decorator
 
+def rate_limit_by_chat(seconds: int):
+    """Rate limit by chat instead of user"""
+    cooldowns = {}
+    lock = asyncio.Lock()
+
+    def decorator(func):
+        @wraps(func)
+        async def wrapped(update: Update, context: ContextTypes.DEFAULT_TYPE):
+            chat_id = update.effective_chat.id
+            async with lock:
+                current_time = time.time()
+                last_time = cooldowns.get(chat_id, 0)
+                if current_time - last_time < seconds:
+                    remaining = int(seconds - (current_time - last_time))
+                    cooldown_message = random.choice(COOLDOWN_REPLIES)
+                    await update.message.reply_text(
+                        f"{cooldown_message} ({remaining}s)"
+                    )
+                    return
+                cooldowns[chat_id] = current_time
+            return await func(update, context)
+        return wrapped
+    return decorator
+
 def premium_only():
     """
     Decorator to restrict command access to premium users only

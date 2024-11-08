@@ -16,3 +16,20 @@ PAUSE_BETWEEN_CHUNKS = 0.5
 
 # Maximum file size for audio/video processing (20 MB in bytes)
 MAX_FILE_SIZE = 20 * 1024 * 1024
+
+# Supported MIME types
+SUPPORTED_AUDIO_TYPES = [
+    'audio/mpeg', 'audio/mp4', 'audio/ogg',
+    'audio/wav', 'audio/webm', 'audio/x-wav'
+]
+
+SUPPORTED_VIDEO_TYPES = [
+    'video/mp4', 'video/mpeg', 'video/ogg',
+    'video/webm', 'video/quicktime'
+]
+
+SUPPORTED_DOCUMENT_TYPES = [
+    'text/plain', 'application/pdf',
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+]

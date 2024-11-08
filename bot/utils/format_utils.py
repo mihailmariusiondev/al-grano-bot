@@ -1,5 +1,9 @@
 import logging
 from typing import List, Dict
+from telegram import Update
+from telegram.constants import MessageLimit
+from utils.constants import PAUSE_BETWEEN_CHUNKS
+import asyncio
 
 
 def format_recent_messages(recent_messages: List[Dict]) -> str:
@@ -22,3 +26,13 @@ def format_recent_messages(recent_messages: List[Dict]) -> str:
     logging.info(f"Formatted recent messages: {result}")
 
     return result
+
+async def send_long_message(update: Update, text: str) -> None:
+    """Split and send long messages respecting Telegram's limits"""
+    chunks = [text[i:i + MessageLimit.MAX_TEXT_LENGTH]
+              for i in range(0, len(text), MessageLimit.MAX_TEXT_LENGTH)]
+
+    for chunk in chunks:
+        await update.message.reply_text(chunk)
+        if len(chunks) > 1:
+            await asyncio.sleep(PAUSE_BETWEEN_CHUNKS)

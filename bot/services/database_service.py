@@ -72,6 +72,19 @@ class DatabaseService:
                     )
                 """)
 
+                # Add chat settings table
+                await cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS chat_settings (
+                        chat_id INTEGER PRIMARY KEY,
+                        max_summary_length INTEGER DEFAULT 2000,
+                        language TEXT DEFAULT 'es',
+                        auto_summarize BOOLEAN DEFAULT FALSE,
+                        auto_summarize_threshold INTEGER DEFAULT 50,
+                        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                    )
+                """)
+
                 await self.conn.commit()
         except Exception as e:
             self.logger.error(f"Failed to create tables: {e}")
@@ -282,6 +295,32 @@ class DatabaseService:
         except Exception as e:
             self.logger.error(f"Error fetching user: {e}")
             return None
+
+    async def cleanup_old_messages(self, chat_id: int, days: int = 30) -> None:
+        """Delete messages older than specified days"""
+        try:
+            query = """
+                DELETE FROM telegram_message
+                WHERE chat_id = ? AND created_at < datetime('now', '-? days')
+            """
+            await self.execute(query, (chat_id, days))
+        except Exception as e:
+            logger.error(f"Error cleaning up old messages: {e}")
+            raise
+
+    async def update_usage_stats(self, user_id: int, command: str) -> None:
+        """Track command usage statistics"""
+        try:
+            query = """
+                INSERT INTO command_stats (user_id, command_name, usage_count)
+                VALUES (?, ?, 1)
+                ON CONFLICT (user_id, command_name)
+                DO UPDATE SET usage_count = usage_count + 1
+            """
+            await self.execute(query, (user_id, command))
+        except Exception as e:
+            logger.error(f"Error updating usage stats: {e}")
+            raise
 
 
 db_service = DatabaseService()  # Single instance
