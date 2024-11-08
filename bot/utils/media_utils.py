@@ -12,13 +12,12 @@ def get_file_size(file_path):
         size_bytes /= 1024.0
 
 
-async def compress_audio(input_path, output_path):
+async def compress_audio(input_path, output_path, timeout: int = 300):
     """Compress audio using ffmpeg with Opus codec."""
     try:
         input_size = get_file_size(input_path)
         logging.info(f"Compressing audio. Input file size: {input_size}")
 
-        # Construir el comando de ffmpeg
         cmd = [
             "ffmpeg",
             "-y",
@@ -35,41 +34,43 @@ async def compress_audio(input_path, output_path):
             output_path,
         ]
 
-        # Ejecutar ffmpeg de manera asíncrona
+        # Execute ffmpeg with timeout
         process = await asyncio.create_subprocess_exec(
             *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
         )
 
-        # Esperar a que el proceso termine
-        stdout, stderr = await process.communicate()
+        try:
+            stdout, stderr = await asyncio.wait_for(
+                process.communicate(), timeout=timeout
+            )
+        except asyncio.TimeoutError:
+            process.kill()
+            raise TimeoutError(f"Audio compression timed out after {timeout} seconds")
 
-        # Verificar si el proceso terminó correctamente
         if process.returncode != 0:
-            logging.error(f"Error compressing audio: {stderr.decode()}")
-            raise Exception(f"ffmpeg exited with code {process.returncode}")
+            raise RuntimeError(f"ffmpeg failed with error: {stderr.decode()}")
 
         output_size = get_file_size(output_path)
         logging.info(f"Audio compression complete. Output file size: {output_size}")
         return output_path
 
     except Exception as e:
-        logging.error(f"Unexpected error: {str(e)}")
+        logging.error(f"Error in compress_audio: {str(e)}")
         raise
 
 
-async def extract_audio(input_path, output_path):
+async def extract_audio(input_path, output_path, timeout: int = 300):
     """Extract audio from video using ffmpeg."""
     try:
         input_size = get_file_size(input_path)
         logging.info(f"Extracting audio from video. Input file size: {input_size}")
 
-        # Construir el comando de ffmpeg
         cmd = [
             "ffmpeg",
             "-y",
             "-i",
             input_path,
-            "-vn",  # No incluir video en la salida
+            "-vn",
             "-acodec",
             "pcm_s16le",
             "-ac",
@@ -79,23 +80,25 @@ async def extract_audio(input_path, output_path):
             output_path,
         ]
 
-        # Ejecutar ffmpeg de manera asíncrona
         process = await asyncio.create_subprocess_exec(
             *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
         )
 
-        # Esperar a que el proceso termine
-        stdout, stderr = await process.communicate()
+        try:
+            stdout, stderr = await asyncio.wait_for(
+                process.communicate(), timeout=timeout
+            )
+        except asyncio.TimeoutError:
+            process.kill()
+            raise TimeoutError(f"Audio extraction timed out after {timeout} seconds")
 
-        # Verificar si el proceso terminó correctamente
         if process.returncode != 0:
-            logging.error(f"Error extracting audio: {stderr.decode()}")
-            raise Exception(f"ffmpeg exited with code {process.returncode}")
+            raise RuntimeError(f"ffmpeg failed with error: {stderr.decode()}")
 
         output_size = get_file_size(output_path)
         logging.info(f"Audio extraction complete. Output file size: {output_size}")
         return output_path
 
     except Exception as e:
-        logging.error(f"Unexpected error: {str(e)}")
+        logging.error(f"Error in extract_audio: {str(e)}")
         raise

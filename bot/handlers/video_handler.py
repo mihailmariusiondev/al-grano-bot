@@ -1,6 +1,8 @@
 import tempfile
 import os
 import logging
+import contextlib
+from pathlib import Path
 from telegram import Message
 from telegram.ext import CallbackContext
 from bot.services import openai_service
@@ -43,69 +45,64 @@ async def video_handler(message: Message, context: CallbackContext) -> None:
 
         await message.chat.send_message("Procesando el video, por favor espera...")
 
-        # Create temporary files
-        temp_file_path = None
-        audio_file_path = None
-        compressed_file_path = None
+        # Create temporary files with context management
+        temp_files = []
+        with contextlib.ExitStack() as stack:
+            temp_file = stack.enter_context(
+                tempfile.NamedTemporaryFile(delete=False, suffix=".mp4")
+            )
+            audio_file = stack.enter_context(
+                tempfile.NamedTemporaryFile(delete=False, suffix=".wav")
+            )
+            compressed_file = stack.enter_context(
+                tempfile.NamedTemporaryFile(delete=False, suffix=".ogg")
+            )
 
-        try:
+            temp_files.extend(
+                [
+                    Path(temp_file.name),
+                    Path(audio_file.name),
+                    Path(compressed_file.name),
+                ]
+            )
+
             # Get video file from Telegram
             file = await context.bot.get_file(file_id)
             logging.info(f"Retrieved file info: {file.file_path}")
 
-            # Create temporary files
-            temp_file_path = tempfile.NamedTemporaryFile(
-                delete=False, suffix=".mp4"
-            ).name
-            audio_file_path = tempfile.NamedTemporaryFile(
-                delete=False, suffix=".wav"
-            ).name
-            compressed_file_path = tempfile.NamedTemporaryFile(
-                delete=False, suffix=".ogg"
-            ).name
-
             # Download video
-            await file.download_to_drive(custom_path=temp_file_path)
+            await file.download_to_drive(custom_path=temp_file.name)
             logging.info(
-                f"Video downloaded successfully, size: {get_file_size(temp_file_path)}"
+                f"Video downloaded successfully, size: {get_file_size(temp_file.name)}"
             )
 
             # Extract audio from video
-            await extract_audio(temp_file_path, audio_file_path)
-            logging.info(f"Audio extracted, size: {get_file_size(audio_file_path)}")
+            await extract_audio(temp_file.name, audio_file.name)
+            logging.info(f"Audio extracted, size: {get_file_size(audio_file.name)}")
 
             # Compress extracted audio
-            await compress_audio(audio_file_path, compressed_file_path)
+            await compress_audio(audio_file.name, compressed_file.name)
             logging.info(
-                f"Audio compressed, size: {get_file_size(compressed_file_path)}"
+                f"Audio compressed, size: {get_file_size(compressed_file.name)}"
             )
 
             # Transcribe audio
             logging.info("Starting transcription process")
-            transcription = await openai_service.transcribe_audio(compressed_file_path)
+            transcription = await openai_service.transcribe_audio(compressed_file.name)
             logging.info(f"Transcription completed, length: {len(transcription)} chars")
 
             return transcription
 
-        except Exception as e:
-            logging.error(f"Error processing video: {str(e)}", exc_info=True)
-            await message.reply_text(
-                "Ocurrió un error al procesar la transcripción del video."
-            )
-            raise
-
-        finally:
-            # Cleanup temporary files
-            for file_path in [temp_file_path, audio_file_path, compressed_file_path]:
-                if file_path:
-                    try:
-                        os.unlink(file_path)
-                        logging.info(f"Removed temporary file: {file_path}")
-                    except Exception as e:
-                        logging.error(
-                            f"Error removing temporary file {file_path}: {str(e)}"
-                        )
-
     except Exception as e:
-        logging.error(f"Error in video handler: {str(e)}", exc_info=True)
+        logging.error(f"Error processing video: {str(e)}", exc_info=True)
+        await message.reply_text(
+            "Ocurrió un error al procesar la transcripción del video."
+        )
         raise
+
+    finally:
+        # Clean up temporary files
+        for file_path in temp_files:
+            if file_path.exists():
+                with contextlib.suppress(OSError):
+                    file_path.unlink()
