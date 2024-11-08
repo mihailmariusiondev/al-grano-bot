@@ -145,32 +145,6 @@ class DatabaseService:
         """Check if database connection is closed"""
         return self.conn is None or self.conn.closed
 
-    async def get_chat_state(self, chat_id: int):
-        """Get chat state"""
-        try:
-            return await self.fetch_one(
-                "SELECT * FROM telegram_chat_state WHERE chat_id = ?", (chat_id,)
-            )
-        except Exception as e:
-            self.logger.error(f"Error fetching chat state: {e}")
-            return None
-
-    async def save_chat_state(
-        self, chat_id: int, is_bot_started: bool, last_command_usage: int
-    ):
-        """Save chat state"""
-        try:
-            await self.execute(
-                """
-                INSERT OR REPLACE INTO telegram_chat_state (chat_id, is_bot_started, last_command_usage)
-                VALUES (?, ?, ?)
-                """,
-                (chat_id, is_bot_started, last_command_usage),
-            )
-            self.logger.info(f"Chat state saved for chat ID: {chat_id}")
-        except Exception as e:
-            self.logger.error(f"Error saving chat state: {e}")
-
     async def get_recent_messages(self, chat_id: int, limit: int = 300):
         """Get recent messages from a chat"""
         try:
@@ -236,19 +210,6 @@ class DatabaseService:
             self.logger.info(f"Message saved for chat ID: {chat_id}")
         except Exception as e:
             self.logger.error(f"Error saving message: {e}")
-
-    async def get_or_create_chat_state(self, chat_id: int):
-        """Get chat state or create if not exists"""
-        chat_state = await self.get_chat_state(chat_id)
-        if chat_state:
-            return chat_state
-        else:
-            await self.save_chat_state(chat_id, False, 0)
-            return await self.get_chat_state(chat_id)
-
-    async def update_chat_state(self, chat_id: int, updates: Dict) -> Optional[Dict]:
-        """Update chat state (now part of chat_config)"""
-        return await self.update_chat_config(chat_id, updates)
 
     async def get_or_create_user(
         self, user_id: int, username: str, first_name: str, last_name: str
