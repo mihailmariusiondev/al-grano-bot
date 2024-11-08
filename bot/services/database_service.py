@@ -25,8 +25,8 @@ class DatabaseService:
         """Initialize database connection and create tables if needed"""
         try:
             self.db_path = db_path
-            self.connection = await aiosqlite.connect(db_path)
-            self.connection.row_factory = aiosqlite.Row
+            self.conn = await aiosqlite.connect(db_path)
+            self.conn.row_factory = aiosqlite.Row
 
             # Create tables
             await self.execute(
@@ -78,24 +78,15 @@ class DatabaseService:
             """
             )
 
-            await self.execute("""
-                CREATE TABLE IF NOT EXISTS usage_stats (
-                    user_id INTEGER,
-                    command TEXT,
-                    usage_count INTEGER DEFAULT 1,
-                    last_used TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    PRIMARY KEY (user_id, command),
-                    FOREIGN KEY (user_id) REFERENCES telegram_user(user_id)
-                )
-            """)
-
             self.closed = False
-            logger.info("Database initialized successfully")
+            self.logger.info("Database initialized successfully")
         except Exception as e:
-            logger.error(f"Error initializing database: {e}")
+            self.logger.error(f"Error initializing database: {e}")
             raise
 
-    async def execute(self, query: str, params: tuple = ()) -> None:
+    async def execute(
+        self, query: str, params: tuple = (), auto_commit: bool = True
+    ) -> None:
         """Execute a query (INSERT, UPDATE, DELETE)"""
         if not self.conn:
             raise RuntimeError("Database not initialized")
@@ -103,6 +94,22 @@ class DatabaseService:
         async with self.conn.cursor() as cursor:
             await cursor.execute(query, params)
             await self.conn.commit()
+
+    async def execute_transaction(self, queries: List[Tuple[str, tuple]]) -> None:
+        """Execute multiple queries in a transaction"""
+        if not self.conn:
+            raise RuntimeError("Database not initialized")
+
+        async with self.conn.cursor() as cursor:
+            try:
+                await cursor.execute("BEGIN TRANSACTION")
+                for query, params in queries:
+                    await cursor.execute(query, params)
+                await self.conn.commit()
+            except Exception as e:
+                await self.conn.rollback()
+                self.logger.error(f"Transaction failed: {e}")
+                raise
 
     async def fetch_one(self, query: str, params: tuple = ()) -> Optional[Dict]:
         """Fetch a single row from the database"""
@@ -120,6 +127,7 @@ class DatabaseService:
         if self.conn:
             await self.conn.close()
             self.logger.info("Database connection closed")
+            self.conn = None
 
     async def is_premium_user(self, user_id: int) -> bool:
         """Check if a user has premium status"""
@@ -291,178 +299,6 @@ class DatabaseService:
             self.logger.error(f"Error fetching user: {e}")
             return None
 
-    async def get_cleanup_stats(self, chat_id: int) -> Tuple[int, str]:
-        """Get message statistics for cleanup logging"""
-        try:
-            query = """
-                SELECT
-                    COUNT(*) as total_messages,
-                    MIN(created_at) as oldest_message,
-                    MAX(created_at) as newest_message
-                FROM telegram_message
-                WHERE chat_id = ?
-            """
-            stats = await self.fetch_one(query, (chat_id,))
-            return (
-                stats["total_messages"],
-                f"oldest: {stats['oldest_message']}, newest: {stats['newest_message']}",
-            )
-        except Exception as e:
-            logger.error(f"Error getting cleanup stats: {e}")
-            return (0, "unknown")
-
-    async def cleanup_old_messages(
-        self,
-        chat_id: int,
-        days: int = CLEANUP_THRESHOLDS["DAYS_TO_KEEP"],
-        keep_minimum: int = CLEANUP_THRESHOLDS["MINIMUM_MESSAGES"],
-    ) -> None:
-        """
-        Delete messages older than specified days while keeping minimum number of messages.
-
-        Args:
-            chat_id: The chat ID to cleanup
-            days: Number of days of messages to keep
-            keep_minimum: Minimum number of messages to retain
-        """
-        try:
-            # Log initial state
-            initial_count, time_range = await self.get_cleanup_stats(chat_id)
-            logger.info(
-                f"Starting cleanup for chat {chat_id}:\n"
-                f"- Current messages: {initial_count}\n"
-                f"- Time range: {time_range}"
-            )
-
-            if initial_count <= keep_minimum:
-                logger.info(
-                    f"Skipping cleanup for chat {chat_id}: "
-                    f"message count ({initial_count}) <= minimum ({keep_minimum})"
-                )
-                return
-
-            # Begin transaction
-            async with self.connection:
-                # First, ensure we keep the minimum number of recent messages
-                keep_ids_query = """
-                    WITH RankedMessages AS (
-                        SELECT id,
-                            ROW_NUMBER() OVER (
-                                PARTITION BY chat_id
-                                ORDER BY created_at DESC
-                            ) as rn
-                        FROM telegram_message
-                        WHERE chat_id = ?
-                    )
-                    SELECT id
-                    FROM RankedMessages
-                    WHERE rn <= ?
-                """
-
-                # Then delete old messages except the kept ones
-                delete_query = """
-                    DELETE FROM telegram_message
-                    WHERE chat_id = ?
-                    AND created_at < datetime('now', '-? days')
-                    AND id NOT IN (
-                        WITH RankedMessages AS (
-                            SELECT id,
-                                ROW_NUMBER() OVER (
-                                    PARTITION BY chat_id
-                                    ORDER BY created_at DESC
-                                ) as rn
-                            FROM telegram_message
-                            WHERE chat_id = ?
-                        )
-                        SELECT id
-                        FROM RankedMessages
-                        WHERE rn <= ?
-                    )
-                """
-
-                # Execute the deletion
-                result = await self.execute(
-                    delete_query, (chat_id, days, chat_id, keep_minimum)
-                )
-
-                # Get final state
-                final_count, new_time_range = await self.get_cleanup_stats(chat_id)
-                deleted_count = initial_count - final_count
-
-                # Log cleanup results
-                logger.info(
-                    f"Cleanup completed for chat {chat_id}:\n"
-                    f"- Messages deleted: {deleted_count}\n"
-                    f"- Initial count: {initial_count}\n"
-                    f"- Final count: {final_count}\n"
-                    f"- New time range: {new_time_range}"
-                )
-
-                # Warn if cleanup might need adjustment
-                if deleted_count == 0:
-                    logger.warning(
-                        f"No messages were deleted in chat {chat_id}. "
-                        f"Consider adjusting cleanup parameters."
-                    )
-                elif final_count < keep_minimum:
-                    logger.warning(
-                        f"Final message count ({final_count}) is below minimum "
-                        f"({keep_minimum}) for chat {chat_id}"
-                    )
-
-        except Exception as e:
-            logger.error(
-                f"Error during cleanup for chat {chat_id}: {str(e)}", exc_info=True
-            )
-            raise
-
-    async def update_usage_stats(self, user_id: int, command: str) -> None:
-        """Update usage statistics for a command"""
-        try:
-            await self.execute("""
-                INSERT INTO usage_stats (user_id, command, usage_count, last_used)
-                VALUES (?, ?, 1, CURRENT_TIMESTAMP)
-                ON CONFLICT(user_id, command) DO UPDATE SET
-                    usage_count = usage_count + 1,
-                    last_used = CURRENT_TIMESTAMP
-            """, (user_id, command))
-        except Exception as e:
-            logger.error(f"Error updating usage stats: {e}")
-            raise
-
-    async def get_user_usage_stats(self, user_id: int) -> List[Dict]:
-        """Get usage statistics for a user"""
-        try:
-            query = """
-                SELECT command, usage_count, last_used
-                FROM usage_stats
-                WHERE user_id = ?
-                ORDER BY usage_count DESC
-            """
-            return await self.fetch_all(query, (user_id,))
-        except Exception as e:
-            logger.error(f"Error getting user usage stats: {e}")
-            raise
-
-    async def get_message_count(self, chat_id: int) -> int:
-        """Get total message count for a chat"""
-        try:
-            query = "SELECT COUNT(*) as count FROM telegram_message WHERE chat_id = ?"
-            result = await self.fetch_one(query, (chat_id,))
-            return result["count"] if result else 0
-        except Exception as e:
-            logger.error(f"Error getting message count: {e}")
-            raise
-
-    async def get_all_chats(self) -> List[Dict]:
-        """Get all unique chat IDs"""
-        try:
-            query = "SELECT DISTINCT chat_id FROM chat_state"
-            return await self.fetch_all(query)
-        except Exception as e:
-            logger.error(f"Error getting chats: {e}")
-            raise
-
     async def get_chat_config(self, chat_id: int) -> Dict:
         """Get chat configuration, creating default if not exists"""
         try:
@@ -551,6 +387,14 @@ class DatabaseService:
         except Exception as e:
             logger.error(f"Error updating chat config: {e}")
             raise
+
+    async def __aenter__(self):
+        if not self.conn:
+            await self.initialize(self.db_path)
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        await self.close()
 
 
 db_service = DatabaseService()  # Single instance

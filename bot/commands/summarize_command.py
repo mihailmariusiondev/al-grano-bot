@@ -220,9 +220,6 @@ async def summarize_command(update: Update, context: CallbackContext):
         await update_progress(wait_message, PROGRESS_MESSAGES["FINALIZING"])
         await send_long_message(update, summary)
 
-        # Track usage statistics
-        await db_service.update_usage_stats(update.effective_user.id, "summarize")
-
     except Exception as e:
         logger.error(f"Error in summarize_command: {e}", exc_info=True)
         await update.message.reply_text(ERROR_MESSAGES["ERROR_SUMMARIZING"])

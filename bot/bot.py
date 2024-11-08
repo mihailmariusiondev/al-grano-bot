@@ -96,26 +96,5 @@ class TelegramBot:
             await db_service.close()
             self.logger.info("Bot stopped successfully")
 
-    def _schedule_periodic_cleanup(self):
-        """Schedule periodic cleanup of old messages"""
-
-        async def periodic_cleanup():
-            while True:
-                try:
-                    await asyncio.sleep(CLEANUP_THRESHOLDS["CLEANUP_INTERVAL"])
-                    self.logger.info("Starting periodic message cleanup...")
-                    chats = await db_service.get_all_chats()
-                    for chat in chats:
-                        await db_service.cleanup_old_messages(
-                            chat["chat_id"],
-                            days=CLEANUP_THRESHOLDS["DAYS_TO_KEEP"],
-                            keep_minimum=CLEANUP_THRESHOLDS["MINIMUM_MESSAGES"],
-                        )
-                    self.logger.info("Periodic message cleanup completed")
-                except Exception as e:
-                    self.logger.error(f"Error during periodic cleanup: {e}")
-
-        asyncio.create_task(periodic_cleanup())
-
 
 telegram_bot = TelegramBot()
