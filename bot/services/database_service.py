@@ -31,7 +31,7 @@ class DatabaseService:
             # Create tables
             await self.execute(
                 """
-                CREATE TABLE IF NOT EXISTS users (
+                CREATE TABLE IF NOT EXISTS telegram_user (
                     user_id INTEGER PRIMARY KEY,
                     username TEXT,
                     first_name TEXT,
@@ -63,7 +63,7 @@ class DatabaseService:
 
             await self.execute(
                 """
-                CREATE TABLE IF NOT EXISTS messages (
+                CREATE TABLE IF NOT EXISTS telegram_message (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     chat_id INTEGER,
                     user_id INTEGER,
@@ -73,7 +73,7 @@ class DatabaseService:
                     message_type TEXT,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     FOREIGN KEY (chat_id) REFERENCES chat_config(chat_id),
-                    FOREIGN KEY (user_id) REFERENCES users(user_id)
+                    FOREIGN KEY (user_id) REFERENCES telegram_user(user_id)
                 )
             """
             )
@@ -85,7 +85,7 @@ class DatabaseService:
                     usage_count INTEGER DEFAULT 1,
                     last_used TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     PRIMARY KEY (user_id, command),
-                    FOREIGN KEY (user_id) REFERENCES users(user_id)
+                    FOREIGN KEY (user_id) REFERENCES telegram_user(user_id)
                 )
             """)
 
@@ -125,7 +125,7 @@ class DatabaseService:
         """Check if a user has premium status"""
         try:
             user = await self.fetch_one(
-                "SELECT is_premium FROM users WHERE user_id = ?", (user_id,)
+                "SELECT is_premium FROM telegram_user WHERE user_id = ?", (user_id,)
             )
             return user["is_premium"] if user else False
         except Exception as e:
