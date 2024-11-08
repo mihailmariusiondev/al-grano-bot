@@ -1,6 +1,7 @@
 import aiosqlite
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Tuple
 from ..utils.logger import logger
+from utils.constants import CLEANUP_THRESHOLDS
 
 
 class DatabaseService:
@@ -301,16 +302,131 @@ class DatabaseService:
             self.logger.error(f"Error fetching user: {e}")
             return None
 
-    async def cleanup_old_messages(self, chat_id: int, days: int = 30) -> None:
-        """Delete messages older than specified days"""
+    async def get_cleanup_stats(self, chat_id: int) -> Tuple[int, str]:
+        """Get message statistics for cleanup logging"""
         try:
             query = """
-                DELETE FROM telegram_message
-                WHERE chat_id = ? AND created_at < datetime('now', '-? days')
+                SELECT
+                    COUNT(*) as total_messages,
+                    MIN(created_at) as oldest_message,
+                    MAX(created_at) as newest_message
+                FROM telegram_message
+                WHERE chat_id = ?
             """
-            await self.execute(query, (chat_id, days))
+            stats = await self.fetch_one(query, (chat_id,))
+            return (
+                stats['total_messages'],
+                f"oldest: {stats['oldest_message']}, newest: {stats['newest_message']}"
+            )
         except Exception as e:
-            logger.error(f"Error cleaning up old messages: {e}")
+            logger.error(f"Error getting cleanup stats: {e}")
+            return (0, "unknown")
+
+    async def cleanup_old_messages(
+        self,
+        chat_id: int,
+        days: int = CLEANUP_THRESHOLDS['DAYS_TO_KEEP'],
+        keep_minimum: int = CLEANUP_THRESHOLDS['MINIMUM_MESSAGES']
+    ) -> None:
+        """
+        Delete messages older than specified days while keeping minimum number of messages.
+
+        Args:
+            chat_id: The chat ID to cleanup
+            days: Number of days of messages to keep
+            keep_minimum: Minimum number of messages to retain
+        """
+        try:
+            # Log initial state
+            initial_count, time_range = await self.get_cleanup_stats(chat_id)
+            logger.info(
+                f"Starting cleanup for chat {chat_id}:\n"
+                f"- Current messages: {initial_count}\n"
+                f"- Time range: {time_range}"
+            )
+
+            if initial_count <= keep_minimum:
+                logger.info(
+                    f"Skipping cleanup for chat {chat_id}: "
+                    f"message count ({initial_count}) <= minimum ({keep_minimum})"
+                )
+                return
+
+            # Begin transaction
+            async with self.connection:
+                # First, ensure we keep the minimum number of recent messages
+                keep_ids_query = """
+                    WITH RankedMessages AS (
+                        SELECT id,
+                            ROW_NUMBER() OVER (
+                                PARTITION BY chat_id
+                                ORDER BY created_at DESC
+                            ) as rn
+                        FROM telegram_message
+                        WHERE chat_id = ?
+                    )
+                    SELECT id
+                    FROM RankedMessages
+                    WHERE rn <= ?
+                """
+
+                # Then delete old messages except the kept ones
+                delete_query = """
+                    DELETE FROM telegram_message
+                    WHERE chat_id = ?
+                    AND created_at < datetime('now', '-? days')
+                    AND id NOT IN (
+                        WITH RankedMessages AS (
+                            SELECT id,
+                                ROW_NUMBER() OVER (
+                                    PARTITION BY chat_id
+                                    ORDER BY created_at DESC
+                                ) as rn
+                            FROM telegram_message
+                            WHERE chat_id = ?
+                        )
+                        SELECT id
+                        FROM RankedMessages
+                        WHERE rn <= ?
+                    )
+                """
+
+                # Execute the deletion
+                result = await self.execute(
+                    delete_query,
+                    (chat_id, days, chat_id, keep_minimum)
+                )
+
+                # Get final state
+                final_count, new_time_range = await self.get_cleanup_stats(chat_id)
+                deleted_count = initial_count - final_count
+
+                # Log cleanup results
+                logger.info(
+                    f"Cleanup completed for chat {chat_id}:\n"
+                    f"- Messages deleted: {deleted_count}\n"
+                    f"- Initial count: {initial_count}\n"
+                    f"- Final count: {final_count}\n"
+                    f"- New time range: {new_time_range}"
+                )
+
+                # Warn if cleanup might need adjustment
+                if deleted_count == 0:
+                    logger.warning(
+                        f"No messages were deleted in chat {chat_id}. "
+                        f"Consider adjusting cleanup parameters."
+                    )
+                elif final_count < keep_minimum:
+                    logger.warning(
+                        f"Final message count ({final_count}) is below minimum "
+                        f"({keep_minimum}) for chat {chat_id}"
+                    )
+
+        except Exception as e:
+            logger.error(
+                f"Error during cleanup for chat {chat_id}: {str(e)}",
+                exc_info=True
+            )
             raise
 
     async def update_usage_stats(self, user_id: int, command: str) -> None:
@@ -332,7 +448,7 @@ class DatabaseService:
         try:
             query = "SELECT COUNT(*) as count FROM telegram_message WHERE chat_id = ?"
             result = await self.fetch_one(query, (chat_id,))
-            return result["count"] if result else 0
+            return result['count'] if result else 0
         except Exception as e:
             logger.error(f"Error getting message count: {e}")
             raise
@@ -344,49 +460,6 @@ class DatabaseService:
             return await self.fetch_all(query)
         except Exception as e:
             logger.error(f"Error getting chats: {e}")
-            raise
-
-    async def cleanup_old_messages(
-        self, chat_id: int, days: int = 30, keep_minimum: int = 1000
-    ) -> None:
-        """Delete messages older than specified days while keeping minimum number of messages"""
-        try:
-            # Begin transaction
-            async with self.connection:
-                # Get total message count
-                total_messages = await self.get_message_count(chat_id)
-
-                if total_messages <= keep_minimum:
-                    return
-
-                # Delete old messages but keep at least keep_minimum messages
-                query = """
-                    WITH RankedMessages AS (
-                        SELECT id,
-                               ROW_NUMBER() OVER (ORDER BY created_at DESC) as rn
-                        FROM telegram_message
-                        WHERE chat_id = ?
-                    )
-                    DELETE FROM telegram_message
-                    WHERE id IN (
-                        SELECT id
-                        FROM RankedMessages
-                        WHERE rn > ?
-                    )
-                    AND created_at < datetime('now', '-? days')
-                """
-                await self.execute(query, (chat_id, keep_minimum, days))
-
-                # Log cleanup results
-                new_count = await self.get_message_count(chat_id)
-                deleted = total_messages - new_count
-                self.logger.info(
-                    f"Cleaned up {deleted} messages from chat {chat_id}. "
-                    f"Remaining messages: {new_count}"
-                )
-
-        except Exception as e:
-            logger.error(f"Error cleaning up old messages: {e}")
             raise
 
 

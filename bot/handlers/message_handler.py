@@ -5,6 +5,7 @@ from telegram.ext import ContextTypes
 from bot.utils import get_message_type
 from ..utils.logger import logger
 from ..services.database_service import db_service
+from utils.constants import CLEANUP_THRESHOLDS
 
 logger = logger.get_logger(__name__)
 
@@ -58,8 +59,12 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # Check message count and cleanup if needed
     message_count = await db_service.get_message_count(chat_id)
-    if message_count > 10000:  # Adjust threshold as needed
+    if message_count > CLEANUP_THRESHOLDS['CLEANUP_THRESHOLD']:
         logger.info(f"Chat {chat_id} reached message threshold, cleaning up old messages")
-        await db_service.cleanup_old_messages(chat_id)
+        await db_service.cleanup_old_messages(
+            chat_id,
+            days=CLEANUP_THRESHOLDS['DAYS_TO_KEEP'],
+            keep_minimum=CLEANUP_THRESHOLDS['MINIMUM_MESSAGES']
+        )
 
     await update.message.reply_text("Recibí tu mensaje de texto.")

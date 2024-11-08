@@ -33,3 +33,15 @@ SUPPORTED_DOCUMENT_TYPES = [
     'application/msword',
     'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
 ]
+
+# Database cleanup thresholds
+CLEANUP_THRESHOLDS = {
+    'DAYS_TO_KEEP': 30,              # Keep messages for 30 days
+    'MINIMUM_MESSAGES': 1000,        # Always keep at least 1000 messages per chat
+    'CLEANUP_THRESHOLD': 10000,      # Trigger cleanup when chat reaches 10000 messages
+    'CLEANUP_INTERVAL': 24 * 60 * 60 # Cleanup interval in seconds (24 hours)
+}
+
+# Message limits
+MAX_FILE_SIZE = 20 * 1024 * 1024    # 20MB in bytes
+PAUSE_BETWEEN_CHUNKS = 0.5          # Seconds between message chunks
