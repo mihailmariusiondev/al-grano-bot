@@ -39,7 +39,8 @@ CLEANUP_THRESHOLDS = {
     'DAYS_TO_KEEP': 30,              # Keep messages for 30 days
     'MINIMUM_MESSAGES': 1000,        # Always keep at least 1000 messages per chat
     'CLEANUP_THRESHOLD': 10000,      # Trigger cleanup when chat reaches 10000 messages
-    'CLEANUP_INTERVAL': 24 * 60 * 60 # Cleanup interval in seconds (24 hours)
+    'CLEANUP_INTERVAL': 24 * 60 * 60, # Cleanup interval in seconds (24 hours)
+    'MAX_SUMMARY_LENGTH': 2000       # Maximum length for summaries
 }
 
 # Message limits

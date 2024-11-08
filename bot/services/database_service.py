@@ -21,99 +21,78 @@ class DatabaseService:
             self.logger = logger.get_logger("db_service")
             self.initialized = True
 
-    async def initialize(self, db_path: str = "bot.db"):
-        """Initialize the database connection and create tables"""
-        self.db_path = db_path
+    async def initialize(self, db_path: str):
+        """Initialize database connection and create tables if needed"""
         try:
-            self.conn = await aiosqlite.connect(db_path)
-            await self._create_tables()
-            self.logger.info(f"Database initialized at {db_path}")
+            self.db_path = db_path
+            self.connection = await aiosqlite.connect(db_path)
+            self.connection.row_factory = aiosqlite.Row
+
+            # Create tables
+            await self.execute(
+                """
+                CREATE TABLE IF NOT EXISTS users (
+                    user_id INTEGER PRIMARY KEY,
+                    username TEXT,
+                    first_name TEXT,
+                    last_name TEXT,
+                    is_premium BOOLEAN DEFAULT FALSE,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """
+            )
+
+            await self.execute(
+                """
+                CREATE TABLE IF NOT EXISTS chat_config (
+                    chat_id INTEGER PRIMARY KEY,
+                    max_summary_length INTEGER DEFAULT 2000,
+                    language TEXT DEFAULT 'es',
+                    auto_summarize BOOLEAN DEFAULT FALSE,
+                    auto_summarize_threshold INTEGER DEFAULT 50,
+                    cleanup_days INTEGER DEFAULT 30,
+                    cleanup_min_messages INTEGER DEFAULT 1000,
+                    cleanup_threshold INTEGER DEFAULT 10000,
+                    is_bot_started BOOLEAN DEFAULT FALSE,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """
+            )
+
+            await self.execute(
+                """
+                CREATE TABLE IF NOT EXISTS messages (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    chat_id INTEGER,
+                    user_id INTEGER,
+                    message_text TEXT,
+                    telegram_message_id INTEGER,
+                    telegram_reply_to_message_id INTEGER,
+                    message_type TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (chat_id) REFERENCES chat_config(chat_id),
+                    FOREIGN KEY (user_id) REFERENCES users(user_id)
+                )
+            """
+            )
+
+            await self.execute("""
+                CREATE TABLE IF NOT EXISTS usage_stats (
+                    user_id INTEGER,
+                    command TEXT,
+                    usage_count INTEGER DEFAULT 1,
+                    last_used TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    PRIMARY KEY (user_id, command),
+                    FOREIGN KEY (user_id) REFERENCES users(user_id)
+                )
+            """)
+
+            self.closed = False
+            logger.info("Database initialized successfully")
         except Exception as e:
-            self.logger.error(f"Failed to initialize database: {e}")
-            raise
-
-    async def _create_tables(self):
-        """Create the tables needed for the bot"""
-        try:
-            async with self.conn.cursor() as cursor:
-                # Create TelegramUserEntity table
-                await cursor.execute(
-                    """
-                    CREATE TABLE IF NOT EXISTS telegram_user (
-                        user_id INTEGER PRIMARY KEY,
-                        username TEXT,
-                        first_name TEXT,
-                        last_name TEXT,
-                        usage_count INTEGER DEFAULT 0,
-                        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-                    )
-                """
-                )
-
-                # Create TelegramChatStateEntity table
-                await cursor.execute(
-                    """
-                    CREATE TABLE IF NOT EXISTS telegram_chat_state (
-                        chat_id INTEGER PRIMARY KEY,
-                        is_bot_started BOOLEAN DEFAULT FALSE,
-                        last_command_usage INTEGER DEFAULT 0,
-                        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-                    )
-                """
-                )
-
-                # Create TelegramMessageEntity table
-                await cursor.execute(
-                    """
-                    CREATE TABLE IF NOT EXISTS telegram_message (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        message_text TEXT,
-                        telegram_message_id INTEGER,
-                        telegram_reply_to_message_id INTEGER,
-                        chat_id INTEGER,
-                        user_id INTEGER,
-                        message_type TEXT,
-                        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                        FOREIGN KEY (chat_id) REFERENCES telegram_chat_state (chat_id),
-                        FOREIGN KEY (user_id) REFERENCES telegram_user (user_id)
-                    )
-                """
-                )
-
-                # Add chat settings table
-                await cursor.execute(
-                    """
-                    CREATE TABLE IF NOT EXISTS chat_settings (
-                        chat_id INTEGER PRIMARY KEY,
-                        max_summary_length INTEGER DEFAULT 2000,
-                        language TEXT DEFAULT 'es',
-                        auto_summarize BOOLEAN DEFAULT FALSE,
-                        auto_summarize_threshold INTEGER DEFAULT 50,
-                        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-                    )
-                """
-                )
-
-                # Add chat configuration table
-                await cursor.execute("""
-                    CREATE TABLE IF NOT EXISTS chat_config (
-                        chat_id INTEGER PRIMARY KEY,
-                        max_summary_length INTEGER DEFAULT 2000,
-                        language TEXT DEFAULT 'es',
-                        auto_summarize BOOLEAN DEFAULT FALSE,
-                        auto_summarize_threshold INTEGER DEFAULT 50,
-                        cleanup_days INTEGER DEFAULT 30,
-                        cleanup_min_messages INTEGER DEFAULT 1000,
-                        cleanup_threshold INTEGER DEFAULT 10000,
-                        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-                    )
-                """)
-
-                await self.conn.commit()
-        except Exception as e:
-            self.logger.error(f"Failed to create tables: {e}")
+            logger.error(f"Error initializing database: {e}")
             raise
 
     async def execute(self, query: str, params: tuple = ()) -> None:
@@ -259,16 +238,9 @@ class DatabaseService:
             await self.save_chat_state(chat_id, False, 0)
             return await self.get_chat_state(chat_id)
 
-    async def update_chat_state(self, chat_id: int, updates: dict):
-        """Update chat state"""
-        try:
-            set_clause = ", ".join([f"{key} = ?" for key in updates.keys()])
-            query = f"UPDATE telegram_chat_state SET {set_clause} WHERE chat_id = ?"
-            params = list(updates.values()) + [chat_id]
-            await self.execute(query, tuple(params))
-            self.logger.info(f"Chat state updated for chat ID: {chat_id}")
-        except Exception as e:
-            self.logger.error(f"Error updating chat state: {e}")
+    async def update_chat_state(self, chat_id: int, updates: Dict) -> Optional[Dict]:
+        """Update chat state (now part of chat_config)"""
+        return await self.update_chat_config(chat_id, updates)
 
     async def get_or_create_user(
         self, user_id: int, username: str, first_name: str, last_name: str
@@ -332,8 +304,8 @@ class DatabaseService:
             """
             stats = await self.fetch_one(query, (chat_id,))
             return (
-                stats['total_messages'],
-                f"oldest: {stats['oldest_message']}, newest: {stats['newest_message']}"
+                stats["total_messages"],
+                f"oldest: {stats['oldest_message']}, newest: {stats['newest_message']}",
             )
         except Exception as e:
             logger.error(f"Error getting cleanup stats: {e}")
@@ -342,8 +314,8 @@ class DatabaseService:
     async def cleanup_old_messages(
         self,
         chat_id: int,
-        days: int = CLEANUP_THRESHOLDS['DAYS_TO_KEEP'],
-        keep_minimum: int = CLEANUP_THRESHOLDS['MINIMUM_MESSAGES']
+        days: int = CLEANUP_THRESHOLDS["DAYS_TO_KEEP"],
+        keep_minimum: int = CLEANUP_THRESHOLDS["MINIMUM_MESSAGES"],
     ) -> None:
         """
         Delete messages older than specified days while keeping minimum number of messages.
@@ -410,8 +382,7 @@ class DatabaseService:
 
                 # Execute the deletion
                 result = await self.execute(
-                    delete_query,
-                    (chat_id, days, chat_id, keep_minimum)
+                    delete_query, (chat_id, days, chat_id, keep_minimum)
                 )
 
                 # Get final state
@@ -441,23 +412,36 @@ class DatabaseService:
 
         except Exception as e:
             logger.error(
-                f"Error during cleanup for chat {chat_id}: {str(e)}",
-                exc_info=True
+                f"Error during cleanup for chat {chat_id}: {str(e)}", exc_info=True
             )
             raise
 
     async def update_usage_stats(self, user_id: int, command: str) -> None:
-        """Track command usage statistics"""
+        """Update usage statistics for a command"""
         try:
-            query = """
-                INSERT INTO command_stats (user_id, command_name, usage_count)
-                VALUES (?, ?, 1)
-                ON CONFLICT (user_id, command_name)
-                DO UPDATE SET usage_count = usage_count + 1
-            """
-            await self.execute(query, (user_id, command))
+            await self.execute("""
+                INSERT INTO usage_stats (user_id, command, usage_count, last_used)
+                VALUES (?, ?, 1, CURRENT_TIMESTAMP)
+                ON CONFLICT(user_id, command) DO UPDATE SET
+                    usage_count = usage_count + 1,
+                    last_used = CURRENT_TIMESTAMP
+            """, (user_id, command))
         except Exception as e:
             logger.error(f"Error updating usage stats: {e}")
+            raise
+
+    async def get_user_usage_stats(self, user_id: int) -> List[Dict]:
+        """Get usage statistics for a user"""
+        try:
+            query = """
+                SELECT command, usage_count, last_used
+                FROM usage_stats
+                WHERE user_id = ?
+                ORDER BY usage_count DESC
+            """
+            return await self.fetch_all(query, (user_id,))
+        except Exception as e:
+            logger.error(f"Error getting user usage stats: {e}")
             raise
 
     async def get_message_count(self, chat_id: int) -> int:
@@ -465,7 +449,7 @@ class DatabaseService:
         try:
             query = "SELECT COUNT(*) as count FROM telegram_message WHERE chat_id = ?"
             result = await self.fetch_one(query, (chat_id,))
-            return result['count'] if result else 0
+            return result["count"] if result else 0
         except Exception as e:
             logger.error(f"Error getting message count: {e}")
             raise
@@ -485,10 +469,10 @@ class DatabaseService:
             # Try to get existing config
             query = "SELECT * FROM chat_config WHERE chat_id = ?"
             config = await self.fetch_one(query, (chat_id,))
-
             if not config:
                 # Create default config if none exists
-                await self.execute("""
+                await self.execute(
+                    """
                     INSERT INTO chat_config (
                         chat_id,
                         max_summary_length,
@@ -497,30 +481,29 @@ class DatabaseService:
                         auto_summarize_threshold,
                         cleanup_days,
                         cleanup_min_messages,
-                        cleanup_threshold
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                """, (
-                    chat_id,
-                    CLEANUP_THRESHOLDS['MAX_SUMMARY_LENGTH'],
-                    'es',
-                    False,
-                    50,
-                    CLEANUP_THRESHOLDS['DAYS_TO_KEEP'],
-                    CLEANUP_THRESHOLDS['MINIMUM_MESSAGES'],
-                    CLEANUP_THRESHOLDS['CLEANUP_THRESHOLD']
-                ))
+                        cleanup_threshold,
+                        is_bot_started
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                    (
+                        chat_id,
+                        CLEANUP_THRESHOLDS["MAX_SUMMARY_LENGTH"],
+                        "es",
+                        False,
+                        50,
+                        CLEANUP_THRESHOLDS["DAYS_TO_KEEP"],
+                        CLEANUP_THRESHOLDS["MINIMUM_MESSAGES"],
+                        CLEANUP_THRESHOLDS["CLEANUP_THRESHOLD"],
+                        False,
+                    ),
+                )
                 config = await self.fetch_one(query, (chat_id,))
-
             return dict(config)
         except Exception as e:
             logger.error(f"Error getting chat config: {e}")
             raise
 
-    async def update_chat_config(
-        self,
-        chat_id: int,
-        updates: Dict
-    ) -> Optional[Dict]:
+    async def update_chat_config(self, chat_id: int, updates: Dict) -> Optional[Dict]:
         """Update chat configuration"""
         try:
             # Get current timestamp
@@ -528,13 +511,13 @@ class DatabaseService:
 
             # Build update query dynamically based on provided updates
             valid_fields = {
-                'max_summary_length': int,
-                'language': str,
-                'auto_summarize': bool,
-                'auto_summarize_threshold': int,
-                'cleanup_days': int,
-                'cleanup_min_messages': int,
-                'cleanup_threshold': int
+                "max_summary_length": int,
+                "language": str,
+                "auto_summarize": bool,
+                "auto_summarize_threshold": int,
+                "cleanup_days": int,
+                "cleanup_min_messages": int,
+                "cleanup_threshold": int,
             }
 
             # Validate and filter updates

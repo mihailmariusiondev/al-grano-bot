@@ -39,8 +39,8 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         last_name=user.last_name
     )
 
-    # Get or create the chat state
-    chat_state = await db_service.get_or_create_chat_state(chat_id)
+    # Get or create the chat config
+    chat_config = await db_service.get_chat_config(chat_id)
 
     # Save the message details to the database
     await db_service.save_message(
@@ -54,7 +54,7 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     logging.info(
         f"Saved message details - Sender: {saved_user['user_id']}, Text: {message_text}, "
-        f"ReplyTo: {reply_to_message_id}, ChatState: {chat_state['chat_id']}"
+        f"ReplyTo: {reply_to_message_id}, ChatConfig: {chat_config['chat_id']}"
     )
 
     # Check message count and cleanup if needed

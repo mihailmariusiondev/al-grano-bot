@@ -11,6 +11,7 @@ from .commands import (
     help_handler,
     about_handler,
     summarize_command,
+    stats_handler,
 )
 from .handlers import (
     error_handler,
@@ -54,6 +55,7 @@ class TelegramBot:
         self.application.add_handler(CommandHandler("help", help_handler))
         self.application.add_handler(CommandHandler("about", about_handler))
         self.application.add_handler(CommandHandler("summarize", summarize_command))
+        self.application.add_handler(CommandHandler("stats", stats_handler))
         self.application.add_handler(
             MessageHandler(filters.TEXT & ~filters.COMMAND, message_handler)
         )
@@ -96,17 +98,18 @@ class TelegramBot:
 
     def _schedule_periodic_cleanup(self):
         """Schedule periodic cleanup of old messages"""
+
         async def periodic_cleanup():
             while True:
                 try:
-                    await asyncio.sleep(CLEANUP_THRESHOLDS['CLEANUP_INTERVAL'])
+                    await asyncio.sleep(CLEANUP_THRESHOLDS["CLEANUP_INTERVAL"])
                     self.logger.info("Starting periodic message cleanup...")
                     chats = await db_service.get_all_chats()
                     for chat in chats:
                         await db_service.cleanup_old_messages(
-                            chat['chat_id'],
-                            days=CLEANUP_THRESHOLDS['DAYS_TO_KEEP'],
-                            keep_minimum=CLEANUP_THRESHOLDS['MINIMUM_MESSAGES']
+                            chat["chat_id"],
+                            days=CLEANUP_THRESHOLDS["DAYS_TO_KEEP"],
+                            keep_minimum=CLEANUP_THRESHOLDS["MINIMUM_MESSAGES"],
                         )
                     self.logger.info("Periodic message cleanup completed")
                 except Exception as e:

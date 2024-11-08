@@ -19,6 +19,7 @@ Configuraciones disponibles:
 • cleanup_days - Días a mantener mensajes (default: 30)
 • cleanup_min_messages - Mínimo de mensajes a mantener (default: 1000)
 • cleanup_threshold - Límite para limpieza (default: 10000)
+• is_bot_started - Estado de inicio del bot (true/false)
 """
 
 
