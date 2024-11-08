@@ -55,4 +55,11 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"Saved message details - Sender: {saved_user['user_id']}, Text: {message_text}, "
         f"ReplyTo: {reply_to_message_id}, ChatState: {chat_state['chat_id']}"
     )
+
+    # Check message count and cleanup if needed
+    message_count = await db_service.get_message_count(chat_id)
+    if message_count > 10000:  # Adjust threshold as needed
+        logger.info(f"Chat {chat_id} reached message threshold, cleaning up old messages")
+        await db_service.cleanup_old_messages(chat_id)
+
     await update.message.reply_text("Recibí tu mensaje de texto.")

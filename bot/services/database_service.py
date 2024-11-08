@@ -35,7 +35,8 @@ class DatabaseService:
         try:
             async with self.conn.cursor() as cursor:
                 # Create TelegramUserEntity table
-                await cursor.execute("""
+                await cursor.execute(
+                    """
                     CREATE TABLE IF NOT EXISTS telegram_user (
                         user_id INTEGER PRIMARY KEY,
                         username TEXT,
@@ -44,20 +45,24 @@ class DatabaseService:
                         usage_count INTEGER DEFAULT 0,
                         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
                     )
-                """)
+                """
+                )
 
                 # Create TelegramChatStateEntity table
-                await cursor.execute("""
+                await cursor.execute(
+                    """
                     CREATE TABLE IF NOT EXISTS telegram_chat_state (
                         chat_id INTEGER PRIMARY KEY,
                         is_bot_started BOOLEAN DEFAULT FALSE,
                         last_command_usage INTEGER DEFAULT 0,
                         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
                     )
-                """)
+                """
+                )
 
                 # Create TelegramMessageEntity table
-                await cursor.execute("""
+                await cursor.execute(
+                    """
                     CREATE TABLE IF NOT EXISTS telegram_message (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
                         message_text TEXT,
@@ -70,10 +75,12 @@ class DatabaseService:
                         FOREIGN KEY (chat_id) REFERENCES telegram_chat_state (chat_id),
                         FOREIGN KEY (user_id) REFERENCES telegram_user (user_id)
                     )
-                """)
+                """
+                )
 
                 # Add chat settings table
-                await cursor.execute("""
+                await cursor.execute(
+                    """
                     CREATE TABLE IF NOT EXISTS chat_settings (
                         chat_id INTEGER PRIMARY KEY,
                         max_summary_length INTEGER DEFAULT 2000,
@@ -83,7 +90,8 @@ class DatabaseService:
                         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
                     )
-                """)
+                """
+                )
 
                 await self.conn.commit()
         except Exception as e:
@@ -136,14 +144,15 @@ class DatabaseService:
         """Get chat state"""
         try:
             return await self.fetch_one(
-                "SELECT * FROM telegram_chat_state WHERE chat_id = ?",
-                (chat_id,)
+                "SELECT * FROM telegram_chat_state WHERE chat_id = ?", (chat_id,)
             )
         except Exception as e:
             self.logger.error(f"Error fetching chat state: {e}")
             return None
 
-    async def save_chat_state(self, chat_id: int, is_bot_started: bool, last_command_usage: int):
+    async def save_chat_state(
+        self, chat_id: int, is_bot_started: bool, last_command_usage: int
+    ):
         """Save chat state"""
         try:
             await self.execute(
@@ -151,7 +160,7 @@ class DatabaseService:
                 INSERT OR REPLACE INTO telegram_chat_state (chat_id, is_bot_started, last_command_usage)
                 VALUES (?, ?, ?)
                 """,
-                (chat_id, is_bot_started, last_command_usage)
+                (chat_id, is_bot_started, last_command_usage),
             )
             self.logger.info(f"Chat state saved for chat ID: {chat_id}")
         except Exception as e:
@@ -171,7 +180,7 @@ class DatabaseService:
                     ORDER BY m.id DESC
                     LIMIT ?
                     """,
-                    (chat_id, limit)
+                    (chat_id, limit),
                 )
                 rows = await cursor.fetchall()
                 return [
@@ -180,7 +189,9 @@ class DatabaseService:
                         "message": {
                             "messageText": row["message_text"],
                             "telegramMessageId": row["telegram_message_id"],
-                            "telegramReplyToMessageId": row["telegram_reply_to_message_id"],
+                            "telegramReplyToMessageId": row[
+                                "telegram_reply_to_message_id"
+                            ],
                         },
                     }
                     for row in rows
@@ -215,7 +226,7 @@ class DatabaseService:
                     telegram_message_id,
                     telegram_reply_to_message_id,
                     message_type,
-                )
+                ),
             )
             self.logger.info(f"Message saved for chat ID: {chat_id}")
         except Exception as e:
@@ -242,17 +253,12 @@ class DatabaseService:
             self.logger.error(f"Error updating chat state: {e}")
 
     async def get_or_create_user(
-        self,
-        user_id: int,
-        username: str,
-        first_name: str,
-        last_name: str
+        self, user_id: int, username: str, first_name: str, last_name: str
     ):
         """Get user or create if not exists"""
         try:
             existing_user = await self.fetch_one(
-                "SELECT * FROM telegram_user WHERE user_id = ?",
-                (user_id,)
+                "SELECT * FROM telegram_user WHERE user_id = ?", (user_id,)
             )
 
             if existing_user:
@@ -267,7 +273,7 @@ class DatabaseService:
                         SET username = ?, first_name = ?, last_name = ?
                         WHERE user_id = ?
                         """,
-                        (username, first_name, last_name, user_id)
+                        (username, first_name, last_name, user_id),
                     )
                     self.logger.info(f"User updated: {user_id}")
             else:
@@ -276,7 +282,7 @@ class DatabaseService:
                     INSERT INTO telegram_user (user_id, username, first_name, last_name)
                     VALUES (?, ?, ?, ?)
                     """,
-                    (user_id, username, first_name, last_name)
+                    (user_id, username, first_name, last_name),
                 )
                 self.logger.info(f"User created: {user_id}")
 
@@ -289,8 +295,7 @@ class DatabaseService:
         """Get user"""
         try:
             return await self.fetch_one(
-                "SELECT * FROM telegram_user WHERE user_id = ?",
-                (user_id,)
+                "SELECT * FROM telegram_user WHERE user_id = ?", (user_id,)
             )
         except Exception as e:
             self.logger.error(f"Error fetching user: {e}")
@@ -320,6 +325,68 @@ class DatabaseService:
             await self.execute(query, (user_id, command))
         except Exception as e:
             logger.error(f"Error updating usage stats: {e}")
+            raise
+
+    async def get_message_count(self, chat_id: int) -> int:
+        """Get total message count for a chat"""
+        try:
+            query = "SELECT COUNT(*) as count FROM telegram_message WHERE chat_id = ?"
+            result = await self.fetch_one(query, (chat_id,))
+            return result["count"] if result else 0
+        except Exception as e:
+            logger.error(f"Error getting message count: {e}")
+            raise
+
+    async def get_all_chats(self) -> List[Dict]:
+        """Get all unique chat IDs"""
+        try:
+            query = "SELECT DISTINCT chat_id FROM chat_state"
+            return await self.fetch_all(query)
+        except Exception as e:
+            logger.error(f"Error getting chats: {e}")
+            raise
+
+    async def cleanup_old_messages(
+        self, chat_id: int, days: int = 30, keep_minimum: int = 1000
+    ) -> None:
+        """Delete messages older than specified days while keeping minimum number of messages"""
+        try:
+            # Begin transaction
+            async with self.connection:
+                # Get total message count
+                total_messages = await self.get_message_count(chat_id)
+
+                if total_messages <= keep_minimum:
+                    return
+
+                # Delete old messages but keep at least keep_minimum messages
+                query = """
+                    WITH RankedMessages AS (
+                        SELECT id,
+                               ROW_NUMBER() OVER (ORDER BY created_at DESC) as rn
+                        FROM telegram_message
+                        WHERE chat_id = ?
+                    )
+                    DELETE FROM telegram_message
+                    WHERE id IN (
+                        SELECT id
+                        FROM RankedMessages
+                        WHERE rn > ?
+                    )
+                    AND created_at < datetime('now', '-? days')
+                """
+                await self.execute(query, (chat_id, keep_minimum, days))
+
+                # Log cleanup results
+                new_count = await self.get_message_count(chat_id)
+                deleted = total_messages - new_count
+                self.logger.info(
+                    f"Cleaned up {deleted} messages from chat {chat_id}. "
+                    f"Remaining messages: {new_count}"
+                )
+
+        except Exception as e:
+            logger.error(f"Error cleaning up old messages: {e}")
             raise
 
 
