@@ -2,7 +2,6 @@ import logging
 from typing import Optional
 import requests
 from readability import Document
-from bot.services import openai_service
 
 logger = logging.getLogger(__name__)
 

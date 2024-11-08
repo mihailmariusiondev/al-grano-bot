@@ -5,7 +5,6 @@ from telegram.ext import ContextTypes
 from bot.utils import get_message_type
 from ..utils.logger import logger
 from ..services.database_service import db_service
-from utils.constants import CLEANUP_THRESHOLDS
 
 logger = logger.get_logger(__name__)
 

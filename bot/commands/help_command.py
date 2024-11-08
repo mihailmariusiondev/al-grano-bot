@@ -15,10 +15,11 @@ HELP_MESSAGE = (
     "Este pedazo de bot lo ha creado el crack de @Arkantos2374. El muy cabrón se pulsa todos los costes de hosting y de las APIs de su puto bolsillo, así que si te molo y quieres que siga currando como un hijo de puta, cualquier donativo me vendría de puta madre. Si te sale de los cojones, puedes donar en paypal.me/mariusmihailion. ¡Gracias, puto amo!"
 )
 
+
 @rate_limit_by_chat(30)
 @log_command()
 @bot_started()
-async def help_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         await update.message.reply_text(HELP_MESSAGE, parse_mode="Markdown")
     except Exception as e:

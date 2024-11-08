@@ -26,7 +26,7 @@ Configuraciones disponibles:
 @admin_command()
 @log_command()
 @rate_limit_by_chat(5)
-async def config_handler(update: Update, context: CallbackContext) -> None:
+async def config_command(update: Update, context: CallbackContext) -> None:
     """Handle chat configuration commands"""
     try:
         chat_id = update.effective_chat.id

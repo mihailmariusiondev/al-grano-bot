@@ -11,10 +11,11 @@ ABOUT_MESSAGE = (
 
 logger = logger.get_logger(__name__)
 
+
 @rate_limit_by_chat(30)
 @log_command()
 @bot_started()
-async def about_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def about_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         await update.message.reply_text(ABOUT_MESSAGE, parse_mode="Markdown")
     except Exception as e:
