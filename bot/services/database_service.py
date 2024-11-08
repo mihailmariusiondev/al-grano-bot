@@ -2,6 +2,7 @@ import aiosqlite
 from typing import Optional, List, Dict, Tuple
 from ..utils.logger import logger
 from utils.constants import CLEANUP_THRESHOLDS
+from datetime import datetime
 
 
 class DatabaseService:
@@ -93,6 +94,22 @@ class DatabaseService:
                     )
                 """
                 )
+
+                # Add chat configuration table
+                await cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS chat_config (
+                        chat_id INTEGER PRIMARY KEY,
+                        max_summary_length INTEGER DEFAULT 2000,
+                        language TEXT DEFAULT 'es',
+                        auto_summarize BOOLEAN DEFAULT FALSE,
+                        auto_summarize_threshold INTEGER DEFAULT 50,
+                        cleanup_days INTEGER DEFAULT 30,
+                        cleanup_min_messages INTEGER DEFAULT 1000,
+                        cleanup_threshold INTEGER DEFAULT 10000,
+                        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                    )
+                """)
 
                 await self.conn.commit()
         except Exception as e:
@@ -460,6 +477,96 @@ class DatabaseService:
             return await self.fetch_all(query)
         except Exception as e:
             logger.error(f"Error getting chats: {e}")
+            raise
+
+    async def get_chat_config(self, chat_id: int) -> Dict:
+        """Get chat configuration, creating default if not exists"""
+        try:
+            # Try to get existing config
+            query = "SELECT * FROM chat_config WHERE chat_id = ?"
+            config = await self.fetch_one(query, (chat_id,))
+
+            if not config:
+                # Create default config if none exists
+                await self.execute("""
+                    INSERT INTO chat_config (
+                        chat_id,
+                        max_summary_length,
+                        language,
+                        auto_summarize,
+                        auto_summarize_threshold,
+                        cleanup_days,
+                        cleanup_min_messages,
+                        cleanup_threshold
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    chat_id,
+                    CLEANUP_THRESHOLDS['MAX_SUMMARY_LENGTH'],
+                    'es',
+                    False,
+                    50,
+                    CLEANUP_THRESHOLDS['DAYS_TO_KEEP'],
+                    CLEANUP_THRESHOLDS['MINIMUM_MESSAGES'],
+                    CLEANUP_THRESHOLDS['CLEANUP_THRESHOLD']
+                ))
+                config = await self.fetch_one(query, (chat_id,))
+
+            return dict(config)
+        except Exception as e:
+            logger.error(f"Error getting chat config: {e}")
+            raise
+
+    async def update_chat_config(
+        self,
+        chat_id: int,
+        updates: Dict
+    ) -> Optional[Dict]:
+        """Update chat configuration"""
+        try:
+            # Get current timestamp
+            current_time = datetime.utcnow()
+
+            # Build update query dynamically based on provided updates
+            valid_fields = {
+                'max_summary_length': int,
+                'language': str,
+                'auto_summarize': bool,
+                'auto_summarize_threshold': int,
+                'cleanup_days': int,
+                'cleanup_min_messages': int,
+                'cleanup_threshold': int
+            }
+
+            # Validate and filter updates
+            filtered_updates = {}
+            for key, value in updates.items():
+                if key in valid_fields:
+                    try:
+                        # Convert value to expected type
+                        filtered_updates[key] = valid_fields[key](value)
+                    except ValueError as e:
+                        logger.warning(f"Invalid value for {key}: {value}")
+                        continue
+
+            if not filtered_updates:
+                logger.warning("No valid updates provided")
+                return None
+
+            # Build and execute update query
+            set_clause = ", ".join(f"{k} = ?" for k in filtered_updates.keys())
+            query = f"""
+                UPDATE chat_config
+                SET {set_clause}, updated_at = ?
+                WHERE chat_id = ?
+            """
+
+            values = list(filtered_updates.values()) + [current_time, chat_id]
+            await self.execute(query, values)
+
+            # Return updated config
+            return await self.get_chat_config(chat_id)
+        except Exception as e:
+            logger.error(f"Error updating chat config: {e}")
             raise
 
 
