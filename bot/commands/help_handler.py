@@ -1,7 +1,7 @@
 from telegram import Update
 from telegram.ext import ContextTypes
 from utils.logger import logger
-from utils.decorators import rate_limit, log_command, bot_started
+from utils.decorators import rate_limit_by_chat, log_command, bot_started
 
 logger = logger.get_logger(__name__)
 
@@ -15,7 +15,7 @@ HELP_MESSAGE = (
     "Este pedazo de bot lo ha creado el crack de @Arkantos2374. El muy cabrón se pulsa todos los costes de hosting y de las APIs de su puto bolsillo, así que si te molo y quieres que siga currando como un hijo de puta, cualquier donativo me vendría de puta madre. Si te sale de los cojones, puedes donar en paypal.me/mariusmihailion. ¡Gracias, puto amo!"
 )
 
-@rate_limit(30)
+@rate_limit_by_chat(30)
 @log_command()
 @bot_started()
 async def help_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):

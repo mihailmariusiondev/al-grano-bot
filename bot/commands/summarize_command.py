@@ -1,6 +1,6 @@
 from telegram.ext import CallbackContext
 from telegram import Update
-from utils.decorators import admin_command, log_command, bot_started, rate_limit
+from utils.decorators import admin_command, log_command, bot_started, rate_limit_by_chat
 from utils.format_utils import format_recent_messages, send_long_message
 from utils.logger import logger
 from utils.get_message_type import get_message_type
@@ -89,7 +89,7 @@ async def update_progress(message, text: str, delay: float = 0.5) -> None:
 @admin_command()
 @log_command()
 @bot_started()
-@rate_limit(10)
+@rate_limit_by_chat(10)
 async def summarize_command(update: Update, context: CallbackContext):
     """Handle the /summarize command for different types of content"""
     try:

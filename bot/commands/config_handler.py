@@ -1,6 +1,6 @@
 from telegram import Update
 from telegram.ext import CallbackContext
-from utils.decorators import admin_command, log_command
+from utils.decorators import admin_command, log_command, rate_limit_by_chat
 from services import db_service
 from utils.logger import logger
 
@@ -24,6 +24,7 @@ Configuraciones disponibles:
 
 @admin_command()
 @log_command()
+@rate_limit_by_chat(5)
 async def config_handler(update: Update, context: CallbackContext) -> None:
     """Handle chat configuration commands"""
     try:

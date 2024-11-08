@@ -1,7 +1,7 @@
 from telegram import Update
 from telegram.ext import ContextTypes
 from utils.logger import logger
-from utils.decorators import rate_limit, log_command, bot_started
+from utils.decorators import rate_limit_by_chat, log_command, bot_started
 
 ABOUT_MESSAGE = (
     "Bot creado por @Arkantos2374 con ❤️.\n\n"
@@ -11,7 +11,7 @@ ABOUT_MESSAGE = (
 
 logger = logger.get_logger(__name__)
 
-@rate_limit(30)
+@rate_limit_by_chat(30)
 @log_command()
 @bot_started()
 async def about_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
