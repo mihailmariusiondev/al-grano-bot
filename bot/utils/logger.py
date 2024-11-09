@@ -4,6 +4,7 @@ import os
 from logging.handlers import RotatingFileHandler
 from typing import Optional, Dict
 from pathlib import Path
+from dotenv import load_dotenv
 
 class Logger:
     _instance = None
@@ -18,13 +19,31 @@ class Logger:
     def _init_logger(self):
         """Initialize logger configuration"""
         try:
+            # Asegurarse de que las variables de entorno están cargadas
+            load_dotenv()
+
             self.log_dir = Path("logs")
             self.log_dir.mkdir(parents=True, exist_ok=True)
 
-            self.log_level = logging.INFO
+            # Obtener nivel de log de variable de entorno
+            log_level_name = os.getenv('LOG_LEVEL', 'INFO').upper()
+            self.log_level = getattr(logging, log_level_name, logging.INFO)
+
+            # Si DEBUG_MODE está activo, forzar nivel DEBUG
+            if os.getenv('DEBUG_MODE', 'false').lower() == 'true':
+                self.log_level = logging.DEBUG
+
             self.max_file_size = 10 * 1024 * 1024  # 10MB
             self.backup_count = 5
             self.log_format = "%(asctime)s - %(name)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s"
+
+            # Log inicial para verificar la configuración
+            root_logger = logging.getLogger()
+            root_logger.setLevel(self.log_level)
+            console_handler = logging.StreamHandler(sys.stdout)
+            console_handler.setFormatter(logging.Formatter(self.log_format))
+            root_logger.addHandler(console_handler)
+            root_logger.info(f"Logger initialized with level: {log_level_name}")
 
         except Exception as e:
             print(f"Error initializing logger: {e}")
