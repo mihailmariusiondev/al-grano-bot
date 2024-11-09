@@ -21,6 +21,11 @@ class DatabaseService:
             self.logger = logger.get_logger("db_service")
             self.initialized = True
 
+    @property
+    def closed(self) -> bool:
+        """Check if database connection is closed"""
+        return self.conn is None or self.conn.closed
+
     async def initialize(self, db_path: str):
         """Initialize database connection and create tables if needed"""
         try:
@@ -78,7 +83,6 @@ class DatabaseService:
             """
             )
 
-            self.closed = False
             self.logger.info("Database initialized successfully")
         except Exception as e:
             self.logger.error(f"Error initializing database: {e}")
@@ -91,9 +95,42 @@ class DatabaseService:
         if not self.conn:
             raise RuntimeError("Database not initialized")
 
-        async with self.conn.cursor() as cursor:
-            await cursor.execute(query, params)
-            await self.conn.commit()
+        try:
+            async with self.conn.cursor() as cursor:
+                await cursor.execute(query, params)
+                if auto_commit:
+                    await self.conn.commit()
+                    self.logger.debug(f"Query executed and committed: {query}")
+                else:
+                    self.logger.debug(f"Query executed without commit: {query}")
+        except Exception as e:
+            self.logger.error(f"Error executing query: {query}, error: {str(e)}")
+            if auto_commit:
+                await self.conn.rollback()
+                self.logger.debug("Transaction rolled back")
+            raise
+
+    async def execute_many(
+        self, query: str, params_list: List[tuple], auto_commit: bool = True
+    ) -> None:
+        """Execute multiple queries in a batch"""
+        if not self.conn:
+            raise RuntimeError("Database not initialized")
+
+        try:
+            async with self.conn.cursor() as cursor:
+                await cursor.executemany(query, params_list)
+                if auto_commit:
+                    await self.conn.commit()
+                    self.logger.debug(f"Batch query executed and committed: {query}")
+                else:
+                    self.logger.debug(f"Batch query executed without commit: {query}")
+        except Exception as e:
+            self.logger.error(f"Error executing batch query: {query}, error: {str(e)}")
+            if auto_commit:
+                await self.conn.rollback()
+                self.logger.debug("Transaction rolled back")
+            raise
 
     async def execute_transaction(self, queries: List[Tuple[str, tuple]]) -> None:
         """Execute multiple queries in a transaction"""
@@ -139,11 +176,6 @@ class DatabaseService:
         except Exception as e:
             self.logger.error(f"Error checking premium status for user {user_id}: {e}")
             return False
-
-    @property
-    def closed(self) -> bool:
-        """Check if database connection is closed"""
-        return self.conn is None or self.conn.closed
 
     async def get_recent_messages(self, chat_id: int, limit: int = 300):
         """Get recent messages from a chat"""
@@ -212,43 +244,94 @@ class DatabaseService:
             self.logger.error(f"Error saving message: {e}")
 
     async def get_or_create_user(
-        self, user_id: int, username: str, first_name: str, last_name: str
-    ):
-        """Get user or create if not exists"""
+        self,
+        user_id: int,
+        username: Optional[str] = None,
+        first_name: Optional[str] = None,
+        last_name: Optional[str] = None,
+    ) -> Dict:
+        """Get existing user or create new one"""
         try:
-            existing_user = await self.fetch_one(
-                "SELECT * FROM telegram_user WHERE user_id = ?", (user_id,)
-            )
+            # Get existing user
+            async with self.conn.cursor() as cursor:
+                await cursor.execute(
+                    "SELECT * FROM telegram_user WHERE user_id = ?", (user_id,)
+                )
+                existing_user = await cursor.fetchone()
 
             if existing_user:
-                if (
-                    existing_user["username"] != username
-                    or existing_user["first_name"] != first_name
-                    or existing_user["last_name"] != last_name
-                ):
-                    await self.execute(
-                        """
-                        UPDATE telegram_user
-                        SET username = ?, first_name = ?, last_name = ?
-                        WHERE user_id = ?
-                        """,
-                        (username, first_name, last_name, user_id),
-                    )
-                    self.logger.info(f"User updated: {user_id}")
-            else:
-                await self.execute(
-                    """
-                    INSERT INTO telegram_user (user_id, username, first_name, last_name)
-                    VALUES (?, ?, ?, ?)
-                    """,
-                    (user_id, username, first_name, last_name),
-                )
-                self.logger.info(f"User created: {user_id}")
+                existing_user = dict(existing_user)
+                # Compare existing values with new values safely
+                needs_update = False
+                update_fields = []
+                update_values = []
 
-            return await self.get_user(user_id)
+                # Helper function to compare values safely
+                def values_different(old_val, new_val) -> bool:
+                    if old_val is None and new_val is None:
+                        return False
+                    return old_val != new_val
+
+                # Check each field for updates
+                if values_different(existing_user["username"], username):
+                    update_fields.append("username = ?")
+                    update_values.append(username)
+                    needs_update = True
+
+                if values_different(existing_user["first_name"], first_name):
+                    update_fields.append("first_name = ?")
+                    update_values.append(first_name)
+                    needs_update = True
+
+                if values_different(existing_user["last_name"], last_name):
+                    update_fields.append("last_name = ?")
+                    update_values.append(last_name)
+                    needs_update = True
+
+                # Update user if needed
+                if needs_update:
+                    update_values.append(user_id)  # Add user_id for WHERE clause
+                    update_query = f"""
+                        UPDATE telegram_user
+                        SET {", ".join(update_fields)}, updated_at = CURRENT_TIMESTAMP
+                        WHERE user_id = ?
+                    """
+                    await self.execute(update_query, tuple(update_values))
+                    self.logger.info(
+                        f"User {user_id} updated with fields: {', '.join(update_fields)}"
+                    )
+
+                    # Fetch updated user data
+                    async with self.conn.cursor() as cursor:
+                        await cursor.execute(
+                            "SELECT * FROM telegram_user WHERE user_id = ?", (user_id,)
+                        )
+                        return dict(await cursor.fetchone())
+
+                return existing_user
+
+            else:
+                # Create new user
+                insert_query = """
+                    INSERT INTO telegram_user (
+                        user_id, username, first_name, last_name
+                    ) VALUES (?, ?, ?, ?)
+                """
+                await self.execute(
+                    insert_query, (user_id, username, first_name, last_name)
+                )
+                self.logger.info(f"New user created: {user_id}")
+
+                # Fetch and return the newly created user
+                async with self.conn.cursor() as cursor:
+                    await cursor.execute(
+                        "SELECT * FROM telegram_user WHERE user_id = ?", (user_id,)
+                    )
+                    return dict(await cursor.fetchone())
+
         except Exception as e:
-            self.logger.error(f"Error getting or creating user: {e}")
-            return None
+            self.logger.error(f"Error in get_or_create_user: {e}")
+            raise
 
     async def get_user(self, user_id: int):
         """Get user"""
@@ -260,44 +343,40 @@ class DatabaseService:
             self.logger.error(f"Error fetching user: {e}")
             return None
 
-    async def get_chat_config(self, chat_id: int) -> Dict:
-        """Get chat configuration, creating default if not exists"""
+    async def get_chat_config(self, chat_id: int) -> Optional[Dict]:
+        """Get chat configuration or create default if not exists"""
         try:
             # Try to get existing config
             query = "SELECT * FROM chat_config WHERE chat_id = ?"
-            config = await self.fetch_one(query, (chat_id,))
-            if not config:
-                # Create default config if none exists
-                await self.execute(
-                    """
-                    INSERT INTO chat_config (
-                        chat_id,
-                        max_summary_length,
-                        language,
-                        auto_summarize,
-                        auto_summarize_threshold,
-                        cleanup_days,
-                        cleanup_min_messages,
-                        cleanup_threshold,
-                        is_bot_started
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                    (
-                        chat_id,
-                        CLEANUP_THRESHOLDS["MAX_SUMMARY_LENGTH"],
-                        "es",
-                        False,
-                        50,
-                        CLEANUP_THRESHOLDS["DAYS_TO_KEEP"],
-                        CLEANUP_THRESHOLDS["MINIMUM_MESSAGES"],
-                        CLEANUP_THRESHOLDS["CLEANUP_THRESHOLD"],
-                        False,
-                    ),
-                )
-                config = await self.fetch_one(query, (chat_id,))
-            return dict(config)
+            async with self.conn.cursor() as cursor:
+                await cursor.execute(query, (chat_id,))
+                result = await cursor.fetchone()
+
+                if result:
+                    return dict(result)
+
+                # Create default config if not exists
+                default_config = {
+                    "chat_id": chat_id,
+                    "max_summary_length": CLEANUP_THRESHOLDS["MAX_SUMMARY_LENGTH"],
+                    "language": "es",
+                    "auto_summarize": False,
+                    "auto_summarize_threshold": 50,
+                    "cleanup_days": CLEANUP_THRESHOLDS["DAYS_TO_KEEP"],
+                    "cleanup_min_messages": CLEANUP_THRESHOLDS["MINIMUM_MESSAGES"],
+                    "cleanup_threshold": CLEANUP_THRESHOLDS["CLEANUP_THRESHOLD"],
+                    "is_bot_started": False,
+                }
+
+                columns = ", ".join(default_config.keys())
+                placeholders = ", ".join("?" * len(default_config))
+                query = f"INSERT INTO chat_config ({columns}) VALUES ({placeholders})"
+
+                await self.execute(query, tuple(default_config.values()))
+                return default_config
+
         except Exception as e:
-            logger.error(f"Error getting chat config: {e}")
+            self.logger.error(f"Error getting/creating chat config: {e}")
             raise
 
     async def update_chat_config(self, chat_id: int, updates: Dict) -> Optional[Dict]:
@@ -306,7 +385,7 @@ class DatabaseService:
             # Get current timestamp
             current_time = datetime.utcnow()
 
-            # Build update query dynamically based on provided updates
+            # Define valid fields and their types
             valid_fields = {
                 "max_summary_length": int,
                 "language": str,
@@ -315,38 +394,51 @@ class DatabaseService:
                 "cleanup_days": int,
                 "cleanup_min_messages": int,
                 "cleanup_threshold": int,
+                "is_bot_started": bool,  # Added missing field
             }
 
             # Validate and filter updates
-            filtered_updates = {}
+            valid_updates = {}
             for key, value in updates.items():
-                if key in valid_fields:
-                    try:
-                        # Convert value to expected type
-                        filtered_updates[key] = valid_fields[key](value)
-                    except ValueError as e:
-                        logger.warning(f"Invalid value for {key}: {value}")
-                        continue
+                if key not in valid_fields:
+                    self.logger.warning(f"Invalid configuration field: {key}")
+                    continue
 
-            if not filtered_updates:
-                logger.warning("No valid updates provided")
+                # Type validation and conversion
+                expected_type = valid_fields[key]
+                try:
+                    if expected_type == bool and isinstance(value, str):
+                        value = value.lower() == "true"
+                    else:
+                        value = expected_type(value)
+                    valid_updates[key] = value
+                except (ValueError, TypeError) as e:
+                    self.logger.error(
+                        f"Invalid value for {key}: {value}. Expected {expected_type}"
+                    )
+                    continue
+
+            if not valid_updates:
+                self.logger.warning("No valid updates provided")
                 return None
 
-            # Build and execute update query
-            set_clause = ", ".join(f"{k} = ?" for k in filtered_updates.keys())
+            # Build update query
+            update_fields = [f"{key} = ?" for key in valid_updates.keys()]
+            update_values = list(valid_updates.values())
             query = f"""
                 UPDATE chat_config
-                SET {set_clause}, updated_at = ?
+                SET {', '.join(update_fields)}, updated_at = ?
                 WHERE chat_id = ?
             """
 
-            values = list(filtered_updates.values()) + [current_time, chat_id]
-            await self.execute(query, values)
+            # Execute update
+            await self.execute(query, tuple(update_values + [current_time, chat_id]))
 
-            # Return updated config
+            # Return updated configuration
             return await self.get_chat_config(chat_id)
+
         except Exception as e:
-            logger.error(f"Error updating chat config: {e}")
+            self.logger.error(f"Error updating chat config: {e}")
             raise
 
     async def __aenter__(self):
@@ -356,6 +448,21 @@ class DatabaseService:
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         await self.close()
+
+    async def transaction(self):
+        """Context manager for handling transactions"""
+        if not self.conn:
+            raise RuntimeError("Database not initialized")
+
+        tr = await self.conn.cursor()
+        try:
+            yield tr
+            await self.conn.commit()
+        except Exception:
+            await self.conn.rollback()
+            raise
+        finally:
+            await tr.close()
 
 
 db_service = DatabaseService()  # Single instance

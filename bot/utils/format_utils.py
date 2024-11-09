@@ -8,29 +8,30 @@ import asyncio
 
 def format_recent_messages(recent_messages: List[Dict]) -> str:
     logging.info(f"Formatting recent messages: {recent_messages}")
-
     formatted_messages = []
-    for message in recent_messages:
+    # Reverse messages to maintain chronological order
+    for message in reversed(recent_messages):
         user = message["user"]
         message_content = message["message"]
-
         if message_content.get("telegramReplyToMessageId"):
-            formatted_message = f"{user['firstName']} (replying to {message_content['telegramReplyToMessageId']})"
+            formatted_message = (
+                f"{user['firstName']} (replying to {message_content['telegramReplyToMessageId']}): "
+                f"{message_content['messageText']}"
+            )
         else:
             formatted_message = f"{user['firstName']}: {message_content['messageText']}"
-
         formatted_messages.append(formatted_message)
-
-    result = " | ".join(formatted_messages)
-
+    result = "\n".join(formatted_messages)
     logging.info(f"Formatted recent messages: {result}")
-
     return result
+
 
 async def send_long_message(update: Update, text: str) -> None:
     """Split and send long messages respecting Telegram's limits"""
-    chunks = [text[i:i + MessageLimit.MAX_TEXT_LENGTH]
-              for i in range(0, len(text), MessageLimit.MAX_TEXT_LENGTH)]
+    chunks = [
+        text[i : i + MessageLimit.MAX_TEXT_LENGTH]
+        for i in range(0, len(text), MessageLimit.MAX_TEXT_LENGTH)
+    ]
 
     for chunk in chunks:
         await update.message.reply_text(chunk)
