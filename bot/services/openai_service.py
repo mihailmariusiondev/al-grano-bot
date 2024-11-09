@@ -2,6 +2,7 @@ import openai
 from typing import List, Optional, Dict, Literal
 from ..utils.logger import logger
 
+
 class OpenAIService:
     _instance = None
 
@@ -22,15 +23,12 @@ class OpenAIService:
 
             # System prompts for different summary types
             self.SUMMARY_PROMPTS = {
-
                 "chat": """You are an assistant helping friends catch up in a busy chat group. Your goal is to summarize the conversation in bullet-point format, outlining who said what about which topic.
                 Respond immediately with a short and concise summary, capturing key details and significant events.
                 - (IMPORTANT) NEVER reference message IDs (e.g., #360).
                 - The summary should look like bullet points
                 - Mention who said what about which topic
                 - (VERY IMPORTANT) Should be in Spanish from Spain""",
-
-
                 "youtube": """You are a YouTube video summarizer. Your goal is to provide a comprehensive summary of the video transcript.
                 Follow these rules:
                 1. Structure:
@@ -53,9 +51,6 @@ class OpenAIService:
                    🔍 CONCLUSIONES:
                    [main takeaways/conclusions]"
                 - (VERY IMPORTANT) Should be in Spanish from Spain""",
-
-
-
                 "telegram_video": """You are a direct video content summarizer. Create a summary that captures both visual and spoken content. Follow these rules:
                 1. Length: Aim for 50-60% of original length
                 2. Focus:
@@ -70,9 +65,6 @@ class OpenAIService:
                    "📝 RESUMEN DE VIDEO:
                    [comprehensive summary including context and key points]"
                 - (VERY IMPORTANT) Should be in Spanish from Spain""",
-
-
-
                 "voice_message": """You are a voice message summarizer. Create a clear and natural summary of informal voice messages.
                 Follow these rules:
                 1. Focus:
@@ -92,9 +84,6 @@ class OpenAIService:
                    ✅ PUNTOS IMPORTANTES:
                    [key points in bullet format]"
                 - (VERY IMPORTANT) Should be in Spanish from Spain""",
-
-
-
                 "audio_file": """You are an audio file summarizer specialized in formal audio content like podcasts, interviews, or music.
                 Follow these rules:
                 1. Structure:
@@ -115,8 +104,6 @@ class OpenAIService:
                    🔍 PUNTOS DESTACADOS:
                    [highlights in bullet points]"
                 - (VERY IMPORTANT) Should be in Spanish from Spain""",
-
-
                 "quoted_message": """You are a message quote summarizer. Your goal is to provide context and summarize quoted messages clearly and concisely.
                 Follow these rules:
                 1. Focus:
@@ -132,9 +119,6 @@ class OpenAIService:
                    ✅ DETALLES IMPORTANTES:
                    [important details in bullet points]"
                 - (VERY IMPORTANT) Should be in Spanish from Spain""",
-
-
-
                 "web_article": """You are a web article summarizer. Create a comprehensive summary that captures the key information from articles.
                 Follow these rules:
                 1. Structure:
@@ -155,21 +139,20 @@ class OpenAIService:
                    💡 CONCLUSIONES:
                    [main conclusions]"
                 - (VERY IMPORTANT) Should be in Spanish from Spain""",
-
-
-                "document": """You are a document summarizer. Create a clear and structured summary of the document content.
-                Format:
-                📄 RESUMEN DE DOCUMENTO:
-                [comprehensive summary including context and key points]
-                - (VERY IMPORTANT) Should be in Spanish from Spain""",
-
-
                 "poll": """You are a poll summarizer. Summarize the poll question and options clearly.
                 Format:
                 📊 RESUMEN DE ENCUESTA:
                 ❓ Pregunta: [poll question]
                 📍 Opciones: [formatted options]
                 - (VERY IMPORTANT) Should be in Spanish from Spain""",
+                "document": """You are an expert document analyzer. Your task is to:
+                1. Analyze the content thoroughly
+                2. Provide clear and concise summaries
+                3. Extract key information and main points
+                4. Answer questions about the content accurately
+                5. (VERY IMPORTANT) All responses should be in Spanish from Spain
+                6. When citing information, include relevant context
+                7. Focus on providing practical and actionable insights""",
             }
 
     async def chat_completion(
@@ -177,7 +160,7 @@ class OpenAIService:
         messages: List[Dict[str, str]],
         model: str = "gpt-4o",
         temperature: float = 0.7,
-        max_tokens: Optional[int] = None
+        max_tokens: Optional[int] = None,
     ) -> str:
         if not self.initialized:
             raise RuntimeError("OpenAI service not initialized")
@@ -195,10 +178,7 @@ class OpenAIService:
             raise RuntimeError(f"Failed to process chat completion: {str(e)}") from e
 
     async def transcribe_audio(
-        self,
-        file_path: str,
-        model: str = "whisper-1",
-        language: Optional[str] = None
+        self, file_path: str, model: str = "whisper-1", language: Optional[str] = None
     ) -> str:
         if not self.initialized:
             raise RuntimeError("OpenAI service not initialized")
@@ -206,9 +186,7 @@ class OpenAIService:
             self.logger.debug(f"Transcribing audio file: {file_path}")
             with open(file_path, "rb") as audio_file:
                 response = await self.client.audio.transcriptions.create(
-                    model=model,
-                    file=audio_file,
-                    language=language
+                    model=model, file=audio_file, language=language
                 )
             return response.text
         except Exception as e:
@@ -218,8 +196,17 @@ class OpenAIService:
     async def get_summary(
         self,
         content: str,
-        summary_type: Literal["chat", "youtube", "telegram_video", "voice_message", "audio_file", "quoted_message", "web_article", "document", "poll"],
-        language: str = "Spanish"
+        summary_type: Literal[
+            "chat",
+            "youtube",
+            "telegram_video",
+            "voice_message",
+            "audio_file",
+            "quoted_message",
+            "web_article",
+            "poll",
+        ],
+        language: str = "Spanish",
     ) -> str:
         """Get summary based on content type and language"""
         if not self.initialized:
@@ -231,7 +218,7 @@ class OpenAIService:
 
             messages = [
                 {"role": "system", "content": prompt},
-                {"role": "user", "content": content}
+                {"role": "user", "content": content},
             ]
 
             response = await self.chat_completion(messages)
@@ -240,5 +227,6 @@ class OpenAIService:
         except Exception as e:
             self.logger.error(f"Summary generation failed: {e}", exc_info=True)
             raise RuntimeError(f"Failed to generate summary: {str(e)}") from e
+
 
 openai_service = OpenAIService()  # Single instance

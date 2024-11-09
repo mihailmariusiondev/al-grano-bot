@@ -12,3 +12,5 @@ dependencies:
       - aiosqlite
       - youtube-transcript-api
       - python-readability
+      - python-docx
+      - PyPDF2

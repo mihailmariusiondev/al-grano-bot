@@ -58,5 +58,3 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"Saved message details - Sender: {saved_user['user_id']}, Text: {message_text}, "
         f"ReplyTo: {reply_to_message_id}, ChatConfig: {chat_config['chat_id']}"
     )
-
-    await update.message.reply_text("Recibí tu mensaje de texto.")
