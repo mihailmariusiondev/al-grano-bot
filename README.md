@@ -150,3 +150,36 @@ Contributions are welcome. Please open an issue to discuss major changes before 
 ## License
 
 [MIT](https://choosealicense.com/licenses/mit/)
+
+## TODO
+
+Best strategy for summarising recent messages (summarising in chunks, etc.) and HOW to implement it
+
+- If not chunking, how many messages to summarize at a time?
+- Which model to use for summarization? Note: my best options are gpt-4o and gpt-4o-mini, and they have a limit of 128k tokens.
+- How to handle max tokens?
+- If chunking, how many messages to summarize at a time?
+- How to handle quoted messages?
+- Should I handle media messages? (I'm not sure if it's a good idea to summarize media messages)
+- How to handle long messages?
+- Am I missing anything?
+
+
+
+
+
+Estoy pensando en la siguiente estrategia para resumir los últimos mensajes:
+- Para empezar, no sé cuál sería la manera ideal de resumir una conversación de telegram. ¿Resumir todos los mensajes? (esto seguro que es inviable) ¿Resumir los últimos 300 mensajes? ¿Por qué los últimos 300 y no los 100 o los 500? ¿Por qué no los últimos N mensajes? ¿Qué hacemos con mensajes anteriores? ¿Los olvidamos? ¿Qué hacemos con mensajes ya resumidos? ¿Los incluimos en el resumen?
+- Supongamos que resumimos los últimos 300 mensajes.
+- Por defecto, se arrastran también los mensajes de voz (no audio, ojo) y los video_note para resumir, porque digamos que suelen formar parte de una conversación (quizá esto no sea buena idea y solo se hagan el resumen de texto)
+- Los mensajes de voz y video_note se transcriben a texto primero
+- El límite de caracteres para un mensaje es de 4096 caracteres.
+- El modelo gpt-4o-mini puede resumir 128k tokens, es decir, unos 31250 caracteres.
+- Podriamos coger tanta cantidad de mensajes como hagan falta para llegar a esos 31250 caracteres (hay que tener en cuenta que los mensajes de voz y video_note se transcriben a texto primero, así que habrá que ver cuántos caracteres suponen).
+- Una vez llegados a los 31250 caracteres, se hace un resumen usando gpt-4o-mini.
+- Lo que no sé es cómo pasarle el modelo el mejor contexto posible para que haga un resumen coherente, hay que tener en cuenta que los usuarios pueden responder a un mensaje con otro mensaje, al igual que se puede responder a un mensaje con un mensaje de voz o video_note, supongo que habrá que darle un prompt para que haga un resumen coherente. ¿Cómo podría pasarle el contexto de la mejor manera posible para que el modelo entienda que tiene que hacer un resumen coherente?
+- Ejemplo de contexto: "El usuario X dijo blablabla, el usuario Y respondió blablabla, después el usuario X dijo blablabla y el usuario Y respondió blablabla". ¿Sería esto suficiente para que el modelo haga un resumen coherente? ¿Qué otras estrategias podría usar?
+- De momento estamos lidiando con un solo resumen (chunk), habrá que ver cómo conseguir no perder contexto si se hace un resumen de N chunks (porque esos ya estarán resumidos).
+- Se le pasa el resumen del chunk anterior como contexto para que tenga en cuenta lo que ya se ha resumido.
+- ¿Qué hacemos si hay muy pocos mensajes? ¿Cómo se hace el resumen o qué estrategia usamos?
+- ¿Estoy pasando algo por alto? ¿Hay alguna otra estrategia que no se me ocurre?
