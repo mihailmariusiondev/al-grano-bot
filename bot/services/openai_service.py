@@ -1,6 +1,8 @@
 import openai
 from typing import List, Optional, Dict, Literal
-from ..utils.logger import logger
+
+from bot.utils import chunk_text
+from bot.utils.logger import logger
 
 
 class OpenAIService:
@@ -152,7 +154,7 @@ class OpenAIService:
                     4. Answer questions about the content accurately
                     5. (VERY IMPORTANT) All responses should be in {lang}
                     6. When citing information, include relevant context
-                    7. Focus on providing practical and actionable insights"""
+                    7. Focus on providing practical and actionable insights""",
             }
 
     async def chat_completion(
@@ -226,55 +228,12 @@ class OpenAIService:
             self.logger.error(f"Summary generation failed: {e}", exc_info=True)
             raise
 
-    def chunk_text(self, text: str, chunk_size: int = 2000) -> List[str]:
-        """Divide el texto en chunks más pequeños"""
-        paragraphs = text.split("\n")
-        chunks = []
-        current_chunk = []
-        current_size = 0
-
-        for paragraph in paragraphs:
-            if len(paragraph.strip()) == 0:
-                continue
-
-            # Si el párrafo actual excede el tamaño del chunk, dividirlo
-            if len(paragraph) > chunk_size:
-                if current_chunk:
-                    chunks.append("\n".join(current_chunk))
-                    current_chunk = []
-                    current_size = 0
-                # Dividir el párrafo largo en partes más pequeñas
-                words = paragraph.split()
-                current_part = []
-                current_part_size = 0
-                for word in words:
-                    if current_part_size + len(word) > chunk_size:
-                        chunks.append(" ".join(current_part))
-                        current_part = [word]
-                        current_part_size = len(word)
-                    else:
-                        current_part.append(word)
-                        current_part_size += len(word) + 1
-                if current_part:
-                    chunks.append(" ".join(current_part))
-            else:
-                if current_size + len(paragraph) > chunk_size:
-                    chunks.append("\n".join(current_chunk))
-                    current_chunk = [paragraph]
-                    current_size = len(paragraph)
-                else:
-                    current_chunk.append(paragraph)
-                    current_size += len(paragraph)
-
-        if current_chunk:
-            chunks.append("\n".join(current_chunk))
-
-        return chunks
-
-    async def summarize_large_document(self, text: str, language: str = "Spanish") -> str:
+    async def summarize_large_document(
+        self, text: str, language: str = "Spanish"
+    ) -> str:
         """Procesa documentos grandes en múltiples pasadas"""
         try:
-            chunks = self.chunk_text(text)
+            chunks = chunk_text(text)
 
             chunk_summaries = []
             for chunk in chunks:
@@ -282,7 +241,7 @@ class OpenAIService:
                     content=chunk,
                     summary_type="document",
                     language=language,
-                    model="gpt-4o-mini"
+                    model="gpt-4o-mini",
                 )
                 chunk_summaries.append(summary)
 
@@ -291,12 +250,10 @@ class OpenAIService:
                     content="\n\n".join(chunk_summaries),
                     summary_type="document",
                     language=language,
-                    model="gpt-4o"
+                    model="gpt-4o",
                 )
                 return final_summary
-
             return chunk_summaries[0]
-
         except Exception as e:
             self.logger.error(f"Error procesando documento grande: {e}")
             raise
