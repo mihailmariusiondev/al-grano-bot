@@ -26,6 +26,7 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info(f"Message type: {message_type}")
 
     if not message_text or not user:
+        logger.debug(f"Skipping message processing due to empty message or user")
         return
 
     logging.info(
