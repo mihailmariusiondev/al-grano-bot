@@ -10,6 +10,7 @@ from handlers.youtube_handler import youtube_handler
 from handlers.video_handler import video_handler
 from handlers.audio_handler import audio_handler
 from handlers.article_handler import article_handler
+from handlers.document_handler import document_handler
 import random
 import asyncio
 
@@ -178,10 +179,11 @@ async def summarize_command(update: Update, context: CallbackContext):
                         content = await video_handler(reply_msg, context)
                         summary_type = "telegram_video"
                     elif mime_type in ["text/plain", "application/pdf"]:
-                        await wait_message.edit_text(
-                            "Los documentos de texto y PDF serán soportados próximamente."
+                        await update_progress(
+                            wait_message, PROGRESS_MESSAGES["PROCESSING"]
                         )
-                        return
+                        content = await document_handler(reply_msg, context)
+                        summary_type = "document"
 
             case "photo":
                 if reply_msg.caption:
