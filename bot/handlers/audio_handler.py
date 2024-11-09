@@ -3,6 +3,7 @@ from telegram.ext import CallbackContext
 from bot.services import openai_service
 from utils.constants import MAX_FILE_SIZE
 from utils.media_utils import compress_audio, get_file_size
+from contextlib import ExitStack
 import tempfile
 import os
 import logging
@@ -42,52 +43,53 @@ async def audio_handler(message: Message, context: CallbackContext) -> None:
         file = await context.bot.get_file(file_id)
         logging.info(f"Retrieved file info: {file.file_path}")
 
-        # Create temporary file
-        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".ogg")
-        temp_file_path = temp_file.name
-        temp_file.close()
-        logging.info(f"Created temporary file: {temp_file_path}")
+        # Use ExitStack to manage multiple temporary files
+        with ExitStack() as stack:
+            # Create temporary files that will be automatically cleaned up
+            temp_file = stack.enter_context(
+                tempfile.NamedTemporaryFile(suffix=".ogg", delete=False)
+            )
+            compressed_file = stack.enter_context(
+                tempfile.NamedTemporaryFile(suffix=".ogg", delete=False)
+            )
 
-        try:
-            # Download audio file
-            await file.download_to_drive(custom_path=temp_file_path)
+            temp_file_path = temp_file.name
+            compressed_file_path = compressed_file.name
+
             logging.info(
-                f"Audio downloaded successfully, size: {get_file_size(temp_file_path)}"
+                f"Created temporary files: {temp_file_path}, {compressed_file_path}"
             )
 
-            # Compress audio
-            compressed_file_path = tempfile.NamedTemporaryFile(
-                delete=False, suffix=".ogg"
-            ).name
-            await compress_audio(temp_file_path, compressed_file_path)
-            logging.info(
-                f"Audio compressed, new size: {get_file_size(compressed_file_path)}"
-            )
+            try:
+                # Download audio file
+                await file.download_to_drive(custom_path=temp_file_path)
+                logging.info(
+                    f"Audio downloaded successfully, size: {get_file_size(temp_file_path)}"
+                )
 
-            # Transcribe audio
-            logging.info("Starting transcription process")
-            transcription = await openai_service.transcribe_audio(compressed_file_path)
-            logging.info(f"Transcription completed, length: {len(transcription)} chars")
+                # Compress audio
+                await compress_audio(temp_file_path, compressed_file_path)
+                logging.info(
+                    f"Audio compressed, new size: {get_file_size(compressed_file_path)}"
+                )
 
-            return transcription
+                # Transcribe audio
+                logging.info("Starting transcription process")
+                transcription = await openai_service.transcribe_audio(
+                    compressed_file_path
+                )
+                logging.info(
+                    f"Transcription completed, length: {len(transcription)} chars"
+                )
 
-        except Exception as e:
-            logging.error(f"Error processing audio file: {str(e)}", exc_info=True)
-            await message.reply_text(
-                "Ocurrió un error al procesar la transcripción del audio."
-            )
-            raise
+                return transcription
 
-        finally:
-            # Cleanup temporary files
-            for file_path in [temp_file_path, compressed_file_path]:
-                try:
-                    os.unlink(file_path)
-                    logging.info(f"Removed temporary file: {file_path}")
-                except Exception as e:
-                    logging.error(
-                        f"Error removing temporary file {file_path}: {str(e)}"
-                    )
+            except Exception as e:
+                logging.error(f"Error processing audio file: {str(e)}", exc_info=True)
+                await message.reply_text(
+                    "Ocurrió un error al procesar la transcripción del audio."
+                )
+                raise
 
     except Exception as e:
         logging.error(f"Error in audio handler: {str(e)}", exc_info=True)
