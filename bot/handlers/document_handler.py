@@ -12,7 +12,7 @@ SUPPORTED_DOCUMENT_TYPES = {
 }
 
 async def document_handler(message, context) -> Optional[str]:
-    """Handle document messages using Chat Completions API"""
+    """Handle document messages"""
     try:
         document = message.document
         if document.mime_type not in SUPPORTED_DOCUMENT_TYPES:
@@ -30,13 +30,8 @@ async def document_handler(message, context) -> Optional[str]:
         else:  # text/plain
             text_content = file_bytes.decode('utf-8')
 
-        # Get summary using existing OpenAI service
-        summary = await openai_service.get_summary(
-            content=text_content,
-            summary_type="document"
-        )
-
-        return summary
+        # Summarize using the large document processor
+        return await openai_service.summarize_large_document(text_content)
 
     except Exception as e:
         logging.error(f"Error en document handler: {e}")

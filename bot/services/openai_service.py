@@ -23,13 +23,13 @@ class OpenAIService:
 
             # System prompts for different summary types
             self.SUMMARY_PROMPTS = {
-                "chat": """You are an assistant helping friends catch up in a busy chat group. Your goal is to summarize the conversation in bullet-point format, outlining who said what about which topic.
+                "chat": lambda lang, _: f"""You are an assistant helping friends catch up in a busy chat group. Your goal is to summarize the conversation in bullet-point format, outlining who said what about which topic.
                 Respond immediately with a short and concise summary, capturing key details and significant events.
                 - (IMPORTANT) NEVER reference message IDs (e.g., #360).
                 - The summary should look like bullet points
                 - Mention who said what about which topic
-                - (VERY IMPORTANT) Should be in Spanish from Spain""",
-                "youtube": """You are a YouTube video summarizer. Your goal is to provide a comprehensive summary of the video transcript.
+                - (VERY IMPORTANT) Should be in {lang}""",
+                "youtube": lambda lang, _: f"""You are a YouTube video summarizer. Your goal is to provide a comprehensive summary of the video transcript.
                 Follow these rules:
                 1. Structure:
                    - Lead with the main topic/thesis
@@ -50,8 +50,8 @@ class OpenAIService:
                    [detailed content]
                    🔍 CONCLUSIONES:
                    [main takeaways/conclusions]"
-                - (VERY IMPORTANT) Should be in Spanish from Spain""",
-                "telegram_video": """You are a direct video content summarizer. Create a summary that captures both visual and spoken content. Follow these rules:
+                - (VERY IMPORTANT) Should be in {lang}""",
+                "telegram_video": lambda lang, _: f"""You are a direct video content summarizer. Create a summary that captures both visual and spoken content. Follow these rules:
                 1. Length: Aim for 50-60% of original length
                 2. Focus:
                    - Capture main message and context
@@ -64,8 +64,8 @@ class OpenAIService:
                 4. Format:
                    "📝 RESUMEN DE VIDEO:
                    [comprehensive summary including context and key points]"
-                - (VERY IMPORTANT) Should be in Spanish from Spain""",
-                "voice_message": """You are a voice message summarizer. Create a clear and natural summary of informal voice messages.
+                - (VERY IMPORTANT) Should be in {lang}""",
+                "voice_message": lambda lang, _: f"""You are a voice message summarizer. Create a clear and natural summary of informal voice messages.
                 Follow these rules:
                 1. Focus:
                    - Capture the speaker's tone and intention
@@ -83,8 +83,8 @@ class OpenAIService:
                    [main message]
                    ✅ PUNTOS IMPORTANTES:
                    [key points in bullet format]"
-                - (VERY IMPORTANT) Should be in Spanish from Spain""",
-                "audio_file": """You are an audio file summarizer specialized in formal audio content like podcasts, interviews, or music.
+                - (VERY IMPORTANT) Should be in {lang}""",
+                "audio_file": lambda lang, _: f"""You are an audio file summarizer specialized in formal audio content like podcasts, interviews, or music.
                 Follow these rules:
                 1. Structure:
                    - Identify the type of audio (podcast, interview, etc.)
@@ -103,8 +103,8 @@ class OpenAIService:
                    [main content summary]
                    🔍 PUNTOS DESTACADOS:
                    [highlights in bullet points]"
-                - (VERY IMPORTANT) Should be in Spanish from Spain""",
-                "quoted_message": """You are a message quote summarizer. Your goal is to provide context and summarize quoted messages clearly and concisely.
+                - (VERY IMPORTANT) Should be in {lang}""",
+                "quoted_message": lambda lang, _: f"""You are a message quote summarizer. Your goal is to provide context and summarize quoted messages clearly and concisely.
                 Follow these rules:
                 1. Focus:
                    - Capture the essential message without losing context
@@ -118,8 +118,8 @@ class OpenAIService:
                    [relevant context]
                    ✅ DETALLES IMPORTANTES:
                    [important details in bullet points]"
-                - (VERY IMPORTANT) Should be in Spanish from Spain""",
-                "web_article": """You are a web article summarizer. Create a comprehensive summary that captures the key information from articles.
+                - (VERY IMPORTANT) Should be in {lang}""",
+                "web_article": lambda lang, _: f"""You are a web article summarizer. Create a comprehensive summary that captures the key information from articles.
                 Follow these rules:
                 1. Structure:
                    - Begin with article title and source
@@ -138,21 +138,21 @@ class OpenAIService:
                    [key points in bullet format]
                    💡 CONCLUSIONES:
                    [main conclusions]"
-                - (VERY IMPORTANT) Should be in Spanish from Spain""",
-                "poll": """You are a poll summarizer. Summarize the poll question and options clearly.
+                - (VERY IMPORTANT) Should be in {lang}""",
+                "poll": lambda lang, _: f"""You are a poll summarizer. Summarize the poll question and options clearly.
                 Format:
                 📊 RESUMEN DE ENCUESTA:
                 ❓ Pregunta: [poll question]
                 📍 Opciones: [formatted options]
-                - (VERY IMPORTANT) Should be in Spanish from Spain""",
-                "document": """You are an expert document analyzer. Your task is to:
-                1. Analyze the content thoroughly
-                2. Provide clear and concise summaries
-                3. Extract key information and main points
-                4. Answer questions about the content accurately
-                5. (VERY IMPORTANT) All responses should be in Spanish from Spain
-                6. When citing information, include relevant context
-                7. Focus on providing practical and actionable insights""",
+                - (VERY IMPORTANT) Should be in {lang}""",
+                "document": lambda lang, _: f"""You are an expert document analyzer. Your task is to:
+                    1. Analyze the content thoroughly
+                    2. Provide clear and concise summaries
+                    3. Extract key information and main points
+                    4. Answer questions about the content accurately
+                    5. (VERY IMPORTANT) All responses should be in {lang}
+                    6. When citing information, include relevant context
+                    7. Focus on providing practical and actionable insights"""
             }
 
     async def chat_completion(
@@ -205,15 +205,13 @@ class OpenAIService:
             "quoted_message",
             "web_article",
             "poll",
+            "document",
         ],
         language: str = "Spanish",
+        model: str = "gpt-4o",
     ) -> str:
-        """Get summary based on content type and language"""
-        if not self.initialized:
-            raise RuntimeError("OpenAI service not initialized")
-
+        """Generate a summary using the specified model"""
         try:
-            # Get appropriate prompt based on summary type
             prompt = self.SUMMARY_PROMPTS[summary_type](language, content)
 
             messages = [
@@ -221,12 +219,87 @@ class OpenAIService:
                 {"role": "user", "content": content},
             ]
 
-            response = await self.chat_completion(messages)
+            response = await self.chat_completion(messages, model=model)
             return response
 
         except Exception as e:
             self.logger.error(f"Summary generation failed: {e}", exc_info=True)
-            raise RuntimeError(f"Failed to generate summary: {str(e)}") from e
+            raise
+
+    def chunk_text(self, text: str, chunk_size: int = 2000) -> List[str]:
+        """Divide el texto en chunks más pequeños"""
+        paragraphs = text.split("\n")
+        chunks = []
+        current_chunk = []
+        current_size = 0
+
+        for paragraph in paragraphs:
+            if len(paragraph.strip()) == 0:
+                continue
+
+            # Si el párrafo actual excede el tamaño del chunk, dividirlo
+            if len(paragraph) > chunk_size:
+                if current_chunk:
+                    chunks.append("\n".join(current_chunk))
+                    current_chunk = []
+                    current_size = 0
+                # Dividir el párrafo largo en partes más pequeñas
+                words = paragraph.split()
+                current_part = []
+                current_part_size = 0
+                for word in words:
+                    if current_part_size + len(word) > chunk_size:
+                        chunks.append(" ".join(current_part))
+                        current_part = [word]
+                        current_part_size = len(word)
+                    else:
+                        current_part.append(word)
+                        current_part_size += len(word) + 1
+                if current_part:
+                    chunks.append(" ".join(current_part))
+            else:
+                if current_size + len(paragraph) > chunk_size:
+                    chunks.append("\n".join(current_chunk))
+                    current_chunk = [paragraph]
+                    current_size = len(paragraph)
+                else:
+                    current_chunk.append(paragraph)
+                    current_size += len(paragraph)
+
+        if current_chunk:
+            chunks.append("\n".join(current_chunk))
+
+        return chunks
+
+    async def summarize_large_document(self, text: str, language: str = "Spanish") -> str:
+        """Procesa documentos grandes en múltiples pasadas"""
+        try:
+            chunks = self.chunk_text(text)
+
+            chunk_summaries = []
+            for chunk in chunks:
+                summary = await self.get_summary(
+                    content=chunk,
+                    summary_type="document",
+                    language=language,
+                    model="gpt-4o-mini"
+                )
+                chunk_summaries.append(summary)
+
+            if len(chunk_summaries) > 1:
+                final_summary = await self.get_summary(
+                    content="\n\n".join(chunk_summaries),
+                    summary_type="document",
+                    language=language,
+                    model="gpt-4o"
+                )
+                return final_summary
+
+            return chunk_summaries[0]
+
+        except Exception as e:
+            self.logger.error(f"Error procesando documento grande: {e}")
+            raise
 
 
 openai_service = OpenAIService()  # Single instance
