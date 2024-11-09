@@ -153,22 +153,17 @@ Contributions are welcome. Please open an issue to discuss major changes before 
 
 ## TODO
 
-Best strategy for summarising recent messages (summarising in chunks, etc.) and HOW to implement it
+# FIX
 
-- If not chunking, how many messages to summarize at a time?
-- Which model to use for summarization? Note: my best options are gpt-4o and gpt-4o-mini, and they have a limit of 128k tokens.
-- How to handle max tokens?
-- If chunking, how many messages to summarize at a time?
-- How to handle quoted messages?
-- Should I handle media messages? (I'm not sure if it's a good idea to summarize media messages)
-- How to handle long messages?
-- Am I missing anything?
+6. Potential Oversized Input to OpenAI API
+   Issue:
 
+When summarizing recent messages, the combined text might exceed the token limit of the OpenAI API model, causing errors or increased costs.
 
-
-
+# IDEAS
 
 Estoy pensando en la siguiente estrategia para resumir los últimos mensajes:
+
 - Para empezar, no sé cuál sería la manera ideal de resumir una conversación de telegram. ¿Resumir todos los mensajes? (esto seguro que es inviable) ¿Resumir los últimos 300 mensajes? ¿Por qué los últimos 300 y no los 100 o los 500? ¿Por qué no los últimos N mensajes? ¿Qué hacemos con mensajes anteriores? ¿Los olvidamos? ¿Qué hacemos con mensajes ya resumidos? ¿Los incluimos en el resumen?
 - Supongamos que resumimos los últimos 300 mensajes.
 - Por defecto, se arrastran también los mensajes de voz (no audio, ojo) y los video_note para resumir, porque digamos que suelen formar parte de una conversación (quizá esto no sea buena idea y solo se hagan el resumen de texto)
@@ -183,3 +178,4 @@ Estoy pensando en la siguiente estrategia para resumir los últimos mensajes:
 - Se le pasa el resumen del chunk anterior como contexto para que tenga en cuenta lo que ya se ha resumido.
 - ¿Qué hacemos si hay muy pocos mensajes? ¿Cómo se hace el resumen o qué estrategia usamos?
 - ¿Estoy pasando algo por alto? ¿Hay alguna otra estrategia que no se me ocurre?
+- ¿Lo estoy complicando demasiado?
