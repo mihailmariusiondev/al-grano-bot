@@ -156,9 +156,12 @@ Contributions are welcome. Please open an issue to discuss major changes before 
 # FIX
 
 6. Potential Oversized Input to OpenAI API
-   Issue:
 
+Issue:
 When summarizing recent messages, the combined text might exceed the token limit of the OpenAI API model, causing errors or increased costs.
+
+Issue 2:
+Is it a good idea to let users config all of these?
 
 # IDEAS
 
