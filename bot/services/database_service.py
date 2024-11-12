@@ -53,7 +53,7 @@ class DatabaseService:
                 CREATE TABLE IF NOT EXISTS telegram_chat_state (
                     chat_id INTEGER PRIMARY KEY,
                     is_bot_started BOOLEAN DEFAULT FALSE,
-                    last_command_usage TIMESTAMP,
+                    last_command_usage TIMESTAMP NULL,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
@@ -326,20 +326,23 @@ class DatabaseService:
 
     async def get_chat_state(self, chat_id: int) -> dict:
         """Get chat state, create if not exists"""
-        chat = await self.fetch_one(
+        chat = await self.db.fetchone(
             "SELECT * FROM telegram_chat_state WHERE chat_id = ?", (chat_id,)
         )
         if not chat:
-            await self.execute(
+            # Inicializar con last_command_usage en NULL
+            await self.db.execute(
                 """
-                INSERT INTO telegram_chat_state (chat_id, is_bot_started)
-                VALUES (?, ?)
+                INSERT INTO telegram_chat_state
+                (chat_id, is_bot_started, last_command_usage)
+                VALUES (?, ?, NULL)
                 """,
                 (chat_id, False),
             )
-            chat = await self.fetch_one(
+            chat = await self.db.fetchone(
                 "SELECT * FROM telegram_chat_state WHERE chat_id = ?", (chat_id,)
             )
+        await self.db.commit()
         return dict(chat)
 
     async def update_chat_state(self, chat_id: int, state: dict) -> dict:

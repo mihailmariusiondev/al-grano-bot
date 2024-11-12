@@ -1,7 +1,7 @@
 from telegram import Update
 from telegram.ext import ContextTypes
 from utils.logger import logger
-from utils.decorators import rate_limit_by_chat, log_command, bot_started
+from utils.decorators import log_command, bot_started
 
 logger = logger.get_logger(__name__)
 
@@ -16,7 +16,6 @@ HELP_MESSAGE = (
 )
 
 
-@rate_limit_by_chat(30)
 @log_command()
 @bot_started()
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):

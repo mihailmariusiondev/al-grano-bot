@@ -7,6 +7,7 @@ from ..utils.logger import logger
 from ..services import db_service
 import asyncio
 import random
+from datetime import datetime
 
 logger = logger.get_logger("utils.decorators")
 
@@ -64,26 +65,33 @@ def admin_command(func):
     return wrapped
 
 
-def rate_limit_by_chat(seconds: int):
-    """Rate limit by chat instead of user"""
-    cooldowns = {}
-    lock = asyncio.Lock()
+def cooldown(seconds: int):
+    """Cooldown based on last_command_usage in chat state"""
 
     def decorator(func):
         @wraps(func)
         async def wrapped(update: Update, context: ContextTypes.DEFAULT_TYPE):
             chat_id = update.effective_chat.id
-            async with lock:
-                current_time = time.time()
-                last_time = cooldowns.get(chat_id, 0)
-                if current_time - last_time < seconds:
-                    remaining = int(seconds - (current_time - last_time))
-                    cooldown_message = random.choice(COOLDOWN_REPLIES)
-                    await update.message.reply_text(
-                        f"{cooldown_message} ({remaining}s)"
-                    )
-                    return
-                cooldowns[chat_id] = current_time
+            chat_state = await db_service.get_chat_state(chat_id)
+
+            current_time = datetime.now()
+            last_usage = (
+                datetime.fromisoformat(chat_state.get("last_command_usage"))
+                if chat_state.get("last_command_usage")
+                else None
+            )
+
+            if last_usage and (current_time - last_usage).total_seconds() < seconds:
+                remaining = int(seconds - (current_time - last_usage).total_seconds())
+                cooldown_message = random.choice(COOLDOWN_REPLIES)
+                await update.message.reply_text(f"{cooldown_message} ({remaining}s)")
+                return
+
+            # Actualizar last_command_usage
+            await db_service.update_chat_state(
+                chat_id, {"last_command_usage": current_time.isoformat()}
+            )
+
             return await func(update, context)
 
         return wrapped
