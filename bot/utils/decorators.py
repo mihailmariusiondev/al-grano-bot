@@ -155,8 +155,8 @@ def bot_started():
             if not update.effective_chat:
                 return
             chat_id = update.effective_chat.id
-            chat_config = await db_service.get_chat_config(chat_id)
-            if not chat_config or not chat_config.get("is_bot_started"):
+            chat_state = await db_service.get_chat_state(chat_id)
+            if not chat_state or not chat_state.get("is_bot_started"):
                 logger.warning(f"Bot not started for chat_id: {chat_id}")
                 await update.message.reply_text(
                     "Por favor, inicia el bot primero usando el comando /start"

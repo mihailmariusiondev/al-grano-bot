@@ -26,15 +26,15 @@ class DatabaseService:
         """Check if database connection is closed"""
         return self.conn is None or self.conn.closed
 
-    async def initialize(self, db_path: str):
-        """Initialize database connection and create tables if needed"""
+    async def initialize(self, db_path: str = "bot.db"):
+        """Initialize database connection and create tables"""
         try:
-            self.db_path = db_path
-            self.conn = await aiosqlite.connect(db_path)
-            self.conn.row_factory = aiosqlite.Row
+            self.db = await aiosqlite.connect(db_path)
+            self.db.row_factory = aiosqlite.Row
 
             # Create tables
-            await self.execute(
+
+            await self.db.execute(
                 """
                 CREATE TABLE IF NOT EXISTS telegram_user (
                     user_id INTEGER PRIMARY KEY,
@@ -48,24 +48,17 @@ class DatabaseService:
             """
             )
 
-            await self.execute(
+            await self.db.execute(
                 """
-                CREATE TABLE IF NOT EXISTS chat_config (
+                CREATE TABLE IF NOT EXISTS telegram_chat_state (
                     chat_id INTEGER PRIMARY KEY,
-                    max_summary_length INTEGER DEFAULT 2000,
-                    language TEXT DEFAULT 'es',
-                    auto_summarize BOOLEAN DEFAULT FALSE,
-                    auto_summarize_threshold INTEGER DEFAULT 50,
-                    cleanup_days INTEGER DEFAULT 30,
-                    cleanup_min_messages INTEGER DEFAULT 1000,
-                    cleanup_threshold INTEGER DEFAULT 10000,
                     is_bot_started BOOLEAN DEFAULT FALSE,
+                    last_command_usage TIMESTAMP,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """
             )
-
             await self.execute(
                 """
                 CREATE TABLE IF NOT EXISTS telegram_message (
@@ -83,9 +76,11 @@ class DatabaseService:
             """
             )
 
+            await self.db.commit()
             self.logger.info("Database initialized successfully")
+
         except Exception as e:
-            self.logger.error(f"Error initializing database: {e}")
+            self.logger.error(f"Failed to initialize database: {e}")
             raise
 
     async def execute(
@@ -329,103 +324,38 @@ class DatabaseService:
             self.logger.error(f"Error fetching user: {e}")
             return None
 
-    async def get_chat_config(self, chat_id: int) -> Optional[Dict]:
-        """Get chat configuration or create default if not exists"""
-        try:
-            # Try to get existing config
-            query = "SELECT * FROM chat_config WHERE chat_id = ?"
-            async with self.conn.cursor() as cursor:
-                await cursor.execute(query, (chat_id,))
-                result = await cursor.fetchone()
+    async def get_chat_state(self, chat_id: int) -> dict:
+        """Get chat state, create if not exists"""
+        chat = await self.fetch_one(
+            "SELECT * FROM telegram_chat_state WHERE chat_id = ?", (chat_id,)
+        )
+        if not chat:
+            await self.execute(
+                """
+                INSERT INTO telegram_chat_state (chat_id, is_bot_started)
+                VALUES (?, ?)
+                """,
+                (chat_id, False),
+            )
+            chat = await self.fetch_one(
+                "SELECT * FROM telegram_chat_state WHERE chat_id = ?", (chat_id,)
+            )
+        return dict(chat)
 
-                if result:
-                    return dict(result)
+    async def update_chat_state(self, chat_id: int, state: dict) -> dict:
+        """Update chat state"""
+        set_clause = ", ".join([f"{k} = ?" for k in state.keys()])
+        values = list(state.values()) + [chat_id]
 
-                # Create default config if not exists
-                default_config = {
-                    "chat_id": chat_id,
-                    "max_summary_length": CLEANUP_THRESHOLDS["MAX_SUMMARY_LENGTH"],
-                    "language": "es",
-                    "auto_summarize": False,
-                    "auto_summarize_threshold": 50,
-                    "cleanup_days": CLEANUP_THRESHOLDS["DAYS_TO_KEEP"],
-                    "cleanup_min_messages": CLEANUP_THRESHOLDS["MINIMUM_MESSAGES"],
-                    "cleanup_threshold": CLEANUP_THRESHOLDS["CLEANUP_THRESHOLD"],
-                    "is_bot_started": False,
-                }
-
-                columns = ", ".join(default_config.keys())
-                placeholders = ", ".join("?" * len(default_config))
-                query = f"INSERT INTO chat_config ({columns}) VALUES ({placeholders})"
-
-                await self.execute(query, tuple(default_config.values()))
-                return default_config
-
-        except Exception as e:
-            self.logger.error(f"Error getting/creating chat config: {e}")
-            raise
-
-    async def update_chat_config(self, chat_id: int, updates: Dict) -> Optional[Dict]:
-        """Update chat configuration"""
-        try:
-            # Get current timestamp
-            current_time = datetime.utcnow()
-
-            # Define valid fields and their types
-            valid_fields = {
-                "max_summary_length": int,
-                "language": str,
-                "auto_summarize": bool,
-                "auto_summarize_threshold": int,
-                "cleanup_days": int,
-                "cleanup_min_messages": int,
-                "cleanup_threshold": int,
-                "is_bot_started": bool,  # Added missing field
-            }
-
-            # Validate and filter updates
-            valid_updates = {}
-            for key, value in updates.items():
-                if key not in valid_fields:
-                    self.logger.warning(f"Invalid configuration field: {key}")
-                    continue
-
-                # Type validation and conversion
-                expected_type = valid_fields[key]
-                try:
-                    if expected_type == bool and isinstance(value, str):
-                        value = value.lower() == "true"
-                    else:
-                        value = expected_type(value)
-                    valid_updates[key] = value
-                except (ValueError, TypeError) as e:
-                    self.logger.error(
-                        f"Invalid value for {key}: {value}. Expected {expected_type}"
-                    )
-                    continue
-
-            if not valid_updates:
-                self.logger.warning("No valid updates provided")
-                return None
-
-            # Build update query
-            update_fields = [f"{key} = ?" for key in valid_updates.keys()]
-            update_values = list(valid_updates.values())
-            query = f"""
-                UPDATE chat_config
-                SET {', '.join(update_fields)}, updated_at = ?
-                WHERE chat_id = ?
-            """
-
-            # Execute update
-            await self.execute(query, tuple(update_values + [current_time, chat_id]))
-
-            # Return updated configuration
-            return await self.get_chat_config(chat_id)
-
-        except Exception as e:
-            self.logger.error(f"Error updating chat config: {e}")
-            raise
+        await self.execute(
+            f"""
+            UPDATE telegram_chat_state
+            SET {set_clause}, updated_at = CURRENT_TIMESTAMP
+            WHERE chat_id = ?
+            """,
+            values,
+        )
+        return await self.get_chat_state(chat_id)
 
     async def __aenter__(self):
         if not self.conn:

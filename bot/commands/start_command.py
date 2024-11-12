@@ -14,7 +14,7 @@ START_MESSAGE = "¡Eeeeeeh, figura! Bienvenido/a al puto bot de resumen de mierd
 async def start_command(update: Update, context: CallbackContext):
     try:
         chat_id = update.effective_chat.id
-        await db_service.update_chat_config(chat_id, {"is_bot_started": True})
+        await db_service.update_chat_state(chat_id, {"is_bot_started": True})
         await update.message.reply_text(START_MESSAGE, parse_mode=ParseMode.MARKDOWN)
     except Exception as e:
         logger.error(f"Error en start_handler: {e}")
