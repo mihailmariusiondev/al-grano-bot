@@ -90,7 +90,7 @@ async def update_progress(message, text: str, delay: float = 0.5) -> None:
 @admin_command()
 @log_command()
 @bot_started()
-@rate_limit_by_chat(10)
+@rate_limit_by_chat(60)
 async def summarize_command(update: Update, context: CallbackContext):
     """Handle the /summarize command for different types of content"""
     try:

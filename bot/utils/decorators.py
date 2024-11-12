@@ -115,15 +115,28 @@ def premium_only():
 
 def log_command():
     """
-    Decorator to log command usage
+    Decorator to log command usage with extended user information
     """
 
     def decorator(func):
         @wraps(func)
         async def wrapped(update: Update, context: ContextTypes.DEFAULT_TYPE):
-            user_id = update.effective_user.id
+            user = update.effective_user
             command = update.message.text
-            logger.info(f"Usuario {user_id} ejecutó el comando: {command}")
+
+            # Build user info string with available fields
+            user_info = [
+                f"ID: {user.id}",
+                f"Username: @{user.username}" if user.username else None,
+                f"Name: {user.first_name}" if user.first_name else None,
+                f"Last Name: {user.last_name}" if user.last_name else None,
+            ]
+
+            # Filter out None values and join
+            user_details = " | ".join([info for info in user_info if info])
+
+            logger.info(f"Command executed by [{user_details}]: {command}")
+
             return await func(update, context)
 
         return wrapped
