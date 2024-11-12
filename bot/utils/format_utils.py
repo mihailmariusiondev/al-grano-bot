@@ -7,20 +7,26 @@ import asyncio
 
 
 def format_recent_messages(recent_messages: List[Dict]) -> str:
+    """Format recent messages for summarization"""
     logging.info(f"Formatting recent messages: {recent_messages}")
+
     formatted_messages = []
-    # Reverse messages to maintain chronological order
+
+    # Reverse messages to maintain chronological order (oldest first)
     for message in reversed(recent_messages):
-        user = message["user"]
-        message_content = message["message"]
-        if message_content.get("telegramReplyToMessageId"):
-            formatted_message = (
-                f"{user['firstName']} (replying to {message_content['telegramReplyToMessageId']}): "
-                f"{message_content['messageText']}"
-            )
+        # Extract user info
+        user_name = (
+            message["first_name"] or message["username"] or str(message["user_id"])
+        )
+
+        # Format message with reply if exists
+        if message["telegram_reply_to_message_id"]:
+            formatted_message = f"{user_name} (replying to {message['telegram_reply_to_message_id']}): {message['message_text']}"
         else:
-            formatted_message = f"{user['firstName']}: {message_content['messageText']}"
+            formatted_message = f"{user_name}: {message['message_text']}"
+
         formatted_messages.append(formatted_message)
+
     result = "\n".join(formatted_messages)
     logging.info(f"Formatted recent messages: {result}")
     return result

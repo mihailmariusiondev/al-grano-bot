@@ -177,39 +177,25 @@ class DatabaseService:
             self.logger.error(f"Error checking premium status for user {user_id}: {e}")
             return False
 
-    async def get_recent_messages(self, chat_id: int, limit: int = 300):
+    async def get_recent_messages(self, chat_id: int, limit: int = 300) -> List[Dict]:
         """Get recent messages from a chat"""
         try:
-            async with self.conn.cursor() as cursor:
-                cursor.row_factory = aiosqlite.Row
-                await cursor.execute(
-                    """
-                    SELECT u.first_name, m.message_text, m.telegram_message_id, m.telegram_reply_to_message_id
-                    FROM telegram_message m
-                    INNER JOIN telegram_user u ON m.user_id = u.user_id
+            async with self.get_connection() as conn:
+                query = """
+                    SELECT m.message_text, m.telegram_message_id, m.telegram_reply_to_message_id,
+                           u.user_id, u.first_name, u.last_name, u.username
+                    FROM messages m
+                    JOIN users u ON m.user_id = u.user_id
                     WHERE m.chat_id = ?
-                    ORDER BY m.id DESC
+                    ORDER BY m.telegram_message_id DESC
                     LIMIT ?
-                    """,
-                    (chat_id, limit),
-                )
-                rows = await cursor.fetchall()
-                return [
-                    {
-                        "user": {"firstName": row["first_name"]},
-                        "message": {
-                            "messageText": row["message_text"],
-                            "telegramMessageId": row["telegram_message_id"],
-                            "telegramReplyToMessageId": row[
-                                "telegram_reply_to_message_id"
-                            ],
-                        },
-                    }
-                    for row in rows
-                ]
+                """
+                cursor = await conn.execute(query, (chat_id, limit))
+                messages = await cursor.fetchall()
+                return messages
         except Exception as e:
-            self.logger.error(f"Error fetching recent messages: {e}")
-            return []
+            self.logger.error(f"Error getting recent messages: {e}")
+            raise
 
     async def save_message(
         self,
