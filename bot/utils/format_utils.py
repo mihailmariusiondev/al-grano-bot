@@ -2,7 +2,7 @@ import logging
 from typing import List, Dict
 from telegram import Update
 from telegram.constants import MessageLimit
-from utils.constants import PAUSE_BETWEEN_CHUNKS
+from bot.utils.constants import PAUSE_BETWEEN_CHUNKS
 import asyncio
 
 

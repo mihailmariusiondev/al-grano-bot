@@ -1,7 +1,7 @@
 import logging
 from typing import Optional
 import requests
-from readability import Document
+from readability import parse
 
 logger = logging.getLogger(__name__)
 
@@ -19,11 +19,11 @@ async def article_handler(url: str) -> Optional[str]:
     try:
         # Fetch article content
         response = requests.get(url)
-        doc = Document(response.content)
+        article = parse(response.text)
 
         # Get title and content
-        article_title = doc.title()
-        article_content = doc.summary()
+        article_title = article.title or "Sin título"
+        article_content = article.text_content or article.content or ""
 
         # Format content for summarization
         full_content = f"Title: {article_title}\n\nContent: {article_content}"

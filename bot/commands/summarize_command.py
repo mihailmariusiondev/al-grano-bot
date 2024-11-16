@@ -1,22 +1,22 @@
 from telegram.ext import CallbackContext
 from telegram import Update
-from utils.decorators import (
+from bot.utils.decorators import (
     admin_command,
     log_command,
     bot_started,
     cooldown,
     premium_only,
 )
-from utils.format_utils import format_recent_messages, send_long_message
-from utils.logger import logger
-from utils.get_message_type import get_message_type
-from utils.constants import YOUTUBE_REGEX, ARTICLE_URL_REGEX
-from services import db_service, openai_service
-from handlers.youtube_handler import youtube_handler
-from handlers.video_handler import video_handler
-from handlers.audio_handler import audio_handler
-from handlers.article_handler import article_handler
-from handlers.document_handler import document_handler
+from bot.utils.format_utils import format_recent_messages, send_long_message
+from bot.utils.logger import logger
+from bot.utils.get_message_type import get_message_type
+from bot.utils.constants import YOUTUBE_REGEX, ARTICLE_URL_REGEX
+from bot.services import db_service, openai_service
+from bot.handlers.youtube_handler import youtube_handler
+from bot.handlers.video_handler import video_handler
+from bot.handlers.audio_handler import audio_handler
+from bot.handlers.article_handler import article_handler
+from bot.handlers.document_handler import document_handler
 import random
 import asyncio
 

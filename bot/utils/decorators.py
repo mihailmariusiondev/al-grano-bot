@@ -1,8 +1,8 @@
 from functools import wraps
 from telegram import Update
 from telegram.ext import ContextTypes
-from ..utils.logger import logger
-from ..services import db_service
+from bot.utils.logger import logger
+from bot.services.database_service import db_service
 import random
 from datetime import datetime
 
@@ -42,26 +42,27 @@ COOLDOWN_REPLIES = [
 ]
 
 
-async def admin_command(func):
+def admin_command(func=None):
     """
     Decorator to restrict command access to admin users only
     """
+    def decorator(f):
+        @wraps(f)
+        async def wrapped(update: Update, context: ContextTypes.DEFAULT_TYPE, *args, **kwargs):
+            user_id = update.effective_user.id
+            # Fetch admin users from the database
+            admin_users = await db_service.get_admin_users()
+            if user_id not in admin_users:
+                await update.message.reply_text(
+                    "Este comando es solo para administradores."
+                )
+                return
+            return await f(update, context, *args, **kwargs)
+        return wrapped
 
-    @wraps(func)
-    async def wrapped(
-        update: Update, context: ContextTypes.DEFAULT_TYPE, *args, **kwargs
-    ):
-        user_id = update.effective_user.id
-        # Fetch admin users from the database
-        admin_users = await db_service.get_admin_users()
-        if user_id not in admin_users:
-            await update.message.reply_text(
-                "Este comando es solo para administradores."
-            )
-            return
-        return await func(update, context, *args, **kwargs)
-
-    return wrapped
+    if func is None:
+        return decorator
+    return decorator(func)
 
 
 def cooldown(seconds: int):

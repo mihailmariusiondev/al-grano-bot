@@ -1,7 +1,7 @@
 import openai
 from typing import List, Optional, Dict, Literal
 
-from bot.utils import chunk_text
+from bot.utils.text_utils import chunk_text
 from bot.utils.logger import logger
 
 

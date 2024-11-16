@@ -6,19 +6,19 @@ from telegram.ext import (
     filters,
 )
 from typing import Optional
-from .commands import (
+from bot.commands import (
     start_command,
     help_command,
     about_command,
     summarize_command,
 )
-from .handlers import (
+from bot.handlers import (
     error_handler,
     message_handler,
 )
-from .services.openai_service import openai_service
-from .utils.logger import logger
-from .services.database_service import db_service
+from bot.services.openai_service import openai_service
+from bot.utils.logger import logger
+from bot.services.database_service import db_service
 
 
 class TelegramBot:

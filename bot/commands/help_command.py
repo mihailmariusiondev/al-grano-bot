@@ -1,7 +1,7 @@
 from telegram import Update
+from bot.utils.logger import logger
+from bot.utils.decorators import log_command, bot_started
 from telegram.ext import ContextTypes
-from utils.logger import logger
-from utils.decorators import log_command, bot_started
 
 logger = logger.get_logger(__name__)
 

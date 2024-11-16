@@ -3,7 +3,7 @@ import PyPDF2
 import io
 import logging
 from typing import Optional
-from ..services.openai_service import openai_service
+from bot.services.openai_service import openai_service
 
 SUPPORTED_DOCUMENT_TYPES = {
     "application/pdf": "pdf",

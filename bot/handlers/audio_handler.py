@@ -1,8 +1,8 @@
 from telegram import Message
 from telegram.ext import CallbackContext
 from bot.services import openai_service
-from utils.constants import MAX_FILE_SIZE
-from utils.media_utils import compress_audio, get_file_size
+from bot.utils.constants import MAX_FILE_SIZE
+from bot.utils.media_utils import compress_audio, get_file_size
 from contextlib import ExitStack
 import tempfile
 import logging

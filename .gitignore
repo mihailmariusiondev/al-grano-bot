@@ -140,3 +140,4 @@ logs/
 repopack-output.xml
 repopack-output.txt
 config/bot_settings.json
+bot.db
