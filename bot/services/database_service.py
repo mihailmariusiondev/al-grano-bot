@@ -1,8 +1,6 @@
 import aiosqlite
-from typing import Optional, List, Dict, Tuple
+from typing import Optional, List, Dict
 from ..utils.logger import logger
-from utils.constants import CLEANUP_THRESHOLDS
-from datetime import datetime
 
 
 class DatabaseService:

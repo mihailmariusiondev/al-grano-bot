@@ -1,12 +1,11 @@
 import tempfile
-import os
 import logging
 import contextlib
 from pathlib import Path
 from telegram import Message
 from telegram.ext import CallbackContext
-from bot.services import openai_service
-from bot.utils.media_utils import compress_audio, extract_audio, get_file_size
+from services import openai_service
+from utils.media_utils import compress_audio, extract_audio, get_file_size
 from utils.constants import MAX_FILE_SIZE
 
 logging = logging.getLogger(__name__)

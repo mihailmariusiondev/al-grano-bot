@@ -1,11 +1,8 @@
 from functools import wraps
 from telegram import Update
 from telegram.ext import ContextTypes
-from ..config import config
-import time
 from ..utils.logger import logger
 from ..services import db_service
-import asyncio
 import random
 from datetime import datetime
 

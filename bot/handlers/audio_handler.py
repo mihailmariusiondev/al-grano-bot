@@ -5,7 +5,6 @@ from utils.constants import MAX_FILE_SIZE
 from utils.media_utils import compress_audio, get_file_size
 from contextlib import ExitStack
 import tempfile
-import os
 import logging
 
 

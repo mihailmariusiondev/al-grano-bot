@@ -19,8 +19,6 @@ from .handlers import (
 from .services.openai_service import openai_service
 from .utils.logger import logger
 from .services.database_service import db_service
-from .utils.constants import CLEANUP_THRESHOLDS
-import asyncio
 
 
 class TelegramBot:
