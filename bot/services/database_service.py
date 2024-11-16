@@ -105,44 +105,6 @@ class DatabaseService:
                 self.logger.debug("Transaction rolled back")
             raise
 
-    async def execute_many(
-        self, query: str, params_list: List[tuple], auto_commit: bool = True
-    ) -> None:
-        """Execute multiple queries in a batch"""
-        if not self.conn:
-            raise RuntimeError("Database not initialized")
-
-        try:
-            async with self.conn.cursor() as cursor:
-                await cursor.executemany(query, params_list)
-                if auto_commit:
-                    await self.conn.commit()
-                    self.logger.debug(f"Batch query executed and committed: {query}")
-                else:
-                    self.logger.debug(f"Batch query executed without commit: {query}")
-        except Exception as e:
-            self.logger.error(f"Error executing batch query: {query}, error: {str(e)}")
-            if auto_commit:
-                await self.conn.rollback()
-                self.logger.debug("Transaction rolled back")
-            raise
-
-    async def execute_transaction(self, queries: List[Tuple[str, tuple]]) -> None:
-        """Execute multiple queries in a transaction"""
-        if not self.conn:
-            raise RuntimeError("Database not initialized")
-
-        async with self.conn.cursor() as cursor:
-            try:
-                await cursor.execute("BEGIN TRANSACTION")
-                for query, params in queries:
-                    await cursor.execute(query, params)
-                await self.conn.commit()
-            except Exception as e:
-                await self.conn.rollback()
-                self.logger.error(f"Transaction failed: {e}")
-                raise
-
     async def fetch_one(self, query: str, params: tuple = ()) -> Optional[Dict]:
         """Fetch a single row from the database"""
         if not self.conn:
@@ -367,21 +329,6 @@ class DatabaseService:
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         await self.close()
-
-    async def transaction(self):
-        """Context manager for handling transactions"""
-        if not self.conn:
-            raise RuntimeError("Database not initialized")
-
-        tr = await self.conn.cursor()
-        try:
-            yield tr
-            await self.conn.commit()
-        except Exception:
-            await self.conn.rollback()
-            raise
-        finally:
-            await tr.close()
 
 
 db_service = DatabaseService()  # Single instance
