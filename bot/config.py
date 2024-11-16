@@ -20,9 +20,6 @@ class Config:
             # Database settings
             self.DB_PATH: str = "bot.db"
 
-            # Access settings
-            self.ADMIN_USERS: List[int] = []
-
             # Other settings
             self.DEBUG_MODE: bool = False
             self.ENVIRONMENT: str = "development"
@@ -34,10 +31,6 @@ class Config:
         self.BOT_TOKEN = os.getenv("BOT_TOKEN")
         self.OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
         self.DB_PATH = os.getenv("DB_PATH", "bot.db")
-
-        # Convert comma-separated admin users to list of ints
-        admin_users = os.getenv("ADMIN_USERS", "")
-        self.ADMIN_USERS = [int(id) for id in admin_users.split(",") if id]
 
         self.DEBUG_MODE = os.getenv("DEBUG_MODE", "false").lower() == "true"
         self.ENVIRONMENT = os.getenv("ENVIRONMENT", "development")

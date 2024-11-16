@@ -43,7 +43,8 @@ class DatabaseService:
                     last_name TEXT,
                     is_premium BOOLEAN DEFAULT FALSE,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    is_admin BOOLEAN DEFAULT FALSE
                 )
             """
             )
@@ -329,6 +330,13 @@ class DatabaseService:
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         await self.close()
+
+    async def get_admin_users(self) -> List[int]:
+        """Fetch admin user IDs from the database."""
+        async with aiosqlite.connect(self.db_path) as db:
+            cursor = await db.execute("SELECT user_id FROM users WHERE is_admin = 1")
+            rows = await cursor.fetchall()
+            return [row[0] for row in rows]
 
 
 db_service = DatabaseService()  # Single instance

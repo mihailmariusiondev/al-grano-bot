@@ -45,7 +45,7 @@ COOLDOWN_REPLIES = [
 ]
 
 
-def admin_command(func):
+async def admin_command(func):
     """
     Decorator to restrict command access to admin users only
     """
@@ -55,7 +55,9 @@ def admin_command(func):
         update: Update, context: ContextTypes.DEFAULT_TYPE, *args, **kwargs
     ):
         user_id = update.effective_user.id
-        if not config.ADMIN_USERS or user_id not in config.ADMIN_USERS:
+        # Fetch admin users from the database
+        admin_users = await db_service.get_admin_users()
+        if user_id not in admin_users:
             await update.message.reply_text(
                 "Este comando es solo para administradores."
             )

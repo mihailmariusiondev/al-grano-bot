@@ -2,23 +2,17 @@ from telegram import Update
 from telegram.ext import ContextTypes
 from telegram.error import TelegramError, BadRequest, TimedOut, NetworkError, RetryAfter
 from ..utils.logger import logger
-from ..config import config
+from ..services import db_service
 
 logger = logger.get_logger(__name__)
 
 
 async def notify_admins(context: ContextTypes.DEFAULT_TYPE, message: str):
-    """Notify admins about critical errors"""
-    if not config.ADMIN_USERS:
-        return
-
-    for admin_id in config.ADMIN_USERS:
+    """Notify all admin users about an error."""
+    admin_users = await db_service.get_admin_users()
+    for admin_id in admin_users:
         try:
-            await context.bot.send_message(
-                chat_id=admin_id,
-                text=f"🚨 *ALERTA DE ERROR*\n{message}",
-                parse_mode="Markdown",
-            )
+            await context.bot.send_message(chat_id=admin_id, text=message)
         except Exception as e:
             logger.error(f"Failed to notify admin {admin_id}: {e}")
 
@@ -98,3 +92,6 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
         if update and hasattr(update, "effective_message"):
             message_info = f"\nMensaje: {update.effective_message.text}"
             logger.error(message_info)
+
+        # Notify admins about the error
+        await notify_admins(context, f"Error occurred: {str(context.error)}")
