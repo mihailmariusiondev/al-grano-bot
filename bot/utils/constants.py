@@ -45,4 +45,5 @@ SUPPORTED_DOCUMENT_TYPES = [
 # Message limits
 MAX_FILE_SIZE = 20 * 1024 * 1024  # 20MB in bytes
 PAUSE_BETWEEN_CHUNKS = 0.5  # Seconds between message chunks
+MAX_RECENT_MESSAGES = 300  # Maximum number of recent messages to fetch for summarization
 

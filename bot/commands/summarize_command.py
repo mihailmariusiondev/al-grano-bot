@@ -10,7 +10,7 @@ from bot.utils.decorators import (
 from bot.utils.format_utils import format_recent_messages, send_long_message
 from bot.utils.logger import logger
 from bot.utils.get_message_type import get_message_type
-from bot.utils.constants import YOUTUBE_REGEX, ARTICLE_URL_REGEX
+from bot.utils.constants import YOUTUBE_REGEX, ARTICLE_URL_REGEX, MAX_RECENT_MESSAGES
 from bot.services import db_service, openai_service
 from bot.handlers.youtube_handler import youtube_handler
 from bot.handlers.video_handler import video_handler
@@ -120,7 +120,7 @@ async def summarize_command(update: Update, context: CallbackContext):
             await update_progress(wait_message, PROGRESS_MESSAGES["FETCHING_MESSAGES"])
 
             recent_messages = await db_service.get_recent_messages(
-                update.effective_chat.id, 300
+                update.effective_chat.id, MAX_RECENT_MESSAGES
             )
             if len(recent_messages) < 5:
                 await wait_message.edit_text(ERROR_MESSAGES["NOT_ENOUGH_MESSAGES"])
