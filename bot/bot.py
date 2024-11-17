@@ -9,7 +9,6 @@ from typing import Optional
 from bot.commands import (
     start_command,
     help_command,
-    about_command,
     summarize_command,
 )
 from bot.handlers import (
@@ -50,7 +49,6 @@ class TelegramBot:
 
         self.application.add_handler(CommandHandler("start", start_command))
         self.application.add_handler(CommandHandler("help", help_command))
-        self.application.add_handler(CommandHandler("about", about_command))
         self.application.add_handler(CommandHandler("summarize", summarize_command))
         self.application.add_handler(
             MessageHandler(filters.TEXT & ~filters.COMMAND, message_handler)
