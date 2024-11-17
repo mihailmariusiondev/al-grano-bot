@@ -13,6 +13,14 @@ START_MESSAGE = "¡Eeeeeeh, figura! Bienvenido/a al puto bot de resumen de mierd
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         chat_id = update.effective_chat.id
+        # Get or create user
+        user = update.effective_user
+        await db_service.get_or_create_user(
+            user_id=user.id,
+            username=user.username,
+            first_name=user.first_name,
+            last_name=user.last_name,
+        )
         await db_service.update_chat_state(chat_id, {"is_bot_started": True})
         await update.message.reply_text(START_MESSAGE, parse_mode="Markdown")
     except Exception as e:

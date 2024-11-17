@@ -101,6 +101,15 @@ async def update_progress(message, text: str, delay: float = 0.5) -> None:
 async def summarize_command(update: Update, context: CallbackContext):
     """Handle the /summarize command for different types of content"""
     try:
+        # Get or create user
+        user = update.effective_user
+        await db_service.get_or_create_user(
+            user_id=user.id,
+            username=user.username,
+            first_name=user.first_name,
+            last_name=user.last_name,
+        )
+
         # Initial waiting message
         wait_message = await update.message.reply_text(
             random.choice(WAIT_FOR_SUMMARY_REPLIES)
