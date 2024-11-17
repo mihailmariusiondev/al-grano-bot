@@ -27,12 +27,12 @@ class DatabaseService:
     async def initialize(self, db_path: str = "bot.db"):
         """Initialize database connection and create tables"""
         try:
-            self.db = await aiosqlite.connect(db_path)
-            self.db.row_factory = aiosqlite.Row
+            self.db_path = db_path
+            self.conn = await aiosqlite.connect(db_path)
+            self.conn.row_factory = aiosqlite.Row
 
             # Create tables
-
-            await self.db.execute(
+            await self.conn.execute(
                 """
                 CREATE TABLE IF NOT EXISTS telegram_user (
                     user_id INTEGER PRIMARY KEY,
@@ -47,7 +47,7 @@ class DatabaseService:
             """
             )
 
-            await self.db.execute(
+            await self.conn.execute(
                 """
                 CREATE TABLE IF NOT EXISTS telegram_chat_state (
                     chat_id INTEGER PRIMARY KEY,
@@ -58,7 +58,8 @@ class DatabaseService:
                 )
             """
             )
-            await self.execute(
+
+            await self.conn.execute(
                 """
                 CREATE TABLE IF NOT EXISTS telegram_message (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -69,13 +70,13 @@ class DatabaseService:
                     telegram_reply_to_message_id INTEGER,
                     message_type TEXT,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    FOREIGN KEY (chat_id) REFERENCES chat_config(chat_id),
+                    FOREIGN KEY (chat_id) REFERENCES telegram_chat_state(chat_id),
                     FOREIGN KEY (user_id) REFERENCES telegram_user(user_id)
                 )
             """
             )
 
-            await self.db.commit()
+            await self.conn.commit()
             self.logger.info("Database initialized successfully")
 
         except Exception as e:
@@ -109,11 +110,18 @@ class DatabaseService:
         if not self.conn:
             raise RuntimeError("Database not initialized")
 
-        async with self.conn.cursor() as cursor:
-            cursor.row_factory = aiosqlite.Row
-            await cursor.execute(query, params)
+        async with self.conn.execute(query, params) as cursor:
             result = await cursor.fetchone()
             return dict(result) if result else None
+
+    async def fetch_all(self, query: str, params: tuple = ()) -> List[Dict]:
+        """Fetch all rows from the database"""
+        if not self.conn:
+            raise RuntimeError("Database not initialized")
+
+        async with self.conn.execute(query, params) as cursor:
+            rows = await cursor.fetchall()
+            return [dict(row) for row in rows]
 
     async def close(self):
         """Close the database connection"""
@@ -136,19 +144,17 @@ class DatabaseService:
     async def get_recent_messages(self, chat_id: int, limit: int = 300) -> List[Dict]:
         """Get recent messages from a chat"""
         try:
-            async with self.get_connection() as conn:
-                query = """
-                    SELECT m.message_text, m.telegram_message_id, m.telegram_reply_to_message_id,
-                           u.user_id, u.first_name, u.last_name, u.username
-                    FROM messages m
-                    JOIN users u ON m.user_id = u.user_id
-                    WHERE m.chat_id = ?
-                    ORDER BY m.telegram_message_id DESC
-                    LIMIT ?
-                """
-                cursor = await conn.execute(query, (chat_id, limit))
-                messages = await cursor.fetchall()
-                return messages
+            query = """
+                SELECT m.message_text, m.telegram_message_id, m.telegram_reply_to_message_id,
+                       u.user_id, u.first_name, u.last_name, u.username
+                FROM telegram_message m
+                JOIN telegram_user u ON m.user_id = u.user_id
+                WHERE m.chat_id = ?
+                ORDER BY m.telegram_message_id DESC
+                LIMIT ?
+            """
+            messages = await self.fetch_all(query, (chat_id, limit))
+            return messages
         except Exception as e:
             self.logger.error(f"Error getting recent messages: {e}")
             raise
@@ -159,7 +165,7 @@ class DatabaseService:
         user_id: int,
         message_text: str,
         telegram_message_id: int,
-        telegram_reply_to_message_id: int,
+        telegram_reply_to_message_id: Optional[int],
         message_type: str,
     ):
         """Save a message"""
@@ -195,14 +201,11 @@ class DatabaseService:
         """Get existing user or create new one"""
         try:
             # Get existing user
-            async with self.conn.cursor() as cursor:
-                await cursor.execute(
-                    "SELECT * FROM telegram_user WHERE user_id = ?", (user_id,)
-                )
-                existing_user = await cursor.fetchone()
+            user = await self.fetch_one(
+                "SELECT * FROM telegram_user WHERE user_id = ?", (user_id,)
+            )
 
-            if existing_user:
-                existing_user = dict(existing_user)
+            if user:
                 # Compare existing values with new values safely
                 needs_update = False
                 update_fields = []
@@ -215,17 +218,17 @@ class DatabaseService:
                     return old_val != new_val
 
                 # Check each field for updates
-                if values_different(existing_user["username"], username):
+                if values_different(user["username"], username):
                     update_fields.append("username = ?")
                     update_values.append(username)
                     needs_update = True
 
-                if values_different(existing_user["first_name"], first_name):
+                if values_different(user["first_name"], first_name):
                     update_fields.append("first_name = ?")
                     update_values.append(first_name)
                     needs_update = True
 
-                if values_different(existing_user["last_name"], last_name):
+                if values_different(user["last_name"], last_name):
                     update_fields.append("last_name = ?")
                     update_values.append(last_name)
                     needs_update = True
@@ -244,13 +247,11 @@ class DatabaseService:
                     )
 
                     # Fetch updated user data
-                    async with self.conn.cursor() as cursor:
-                        await cursor.execute(
-                            "SELECT * FROM telegram_user WHERE user_id = ?", (user_id,)
-                        )
-                        return dict(await cursor.fetchone())
+                    user = await self.fetch_one(
+                        "SELECT * FROM telegram_user WHERE user_id = ?", (user_id,)
+                    )
 
-                return existing_user
+                return user
 
             else:
                 # Create new user
@@ -265,11 +266,10 @@ class DatabaseService:
                 self.logger.info(f"New user created: {user_id}")
 
                 # Fetch and return the newly created user
-                async with self.conn.cursor() as cursor:
-                    await cursor.execute(
-                        "SELECT * FROM telegram_user WHERE user_id = ?", (user_id,)
-                    )
-                    return dict(await cursor.fetchone())
+                user = await self.fetch_one(
+                    "SELECT * FROM telegram_user WHERE user_id = ?", (user_id,)
+                )
+                return user
 
         except Exception as e:
             self.logger.error(f"Error in get_or_create_user: {e}")
@@ -287,43 +287,50 @@ class DatabaseService:
 
     async def get_chat_state(self, chat_id: int) -> dict:
         """Get chat state, create if not exists"""
-        chat = await self.db.fetchone(
-            "SELECT * FROM telegram_chat_state WHERE chat_id = ?", (chat_id,)
-        )
-        if not chat:
-            # Inicializar con last_command_usage en NULL
-            await self.db.execute(
-                """
-                INSERT INTO telegram_chat_state
-                (chat_id, is_bot_started, last_command_usage)
-                VALUES (?, ?, NULL)
-                """,
-                (chat_id, False),
-            )
-            chat = await self.db.fetchone(
+        try:
+            chat = await self.fetch_one(
                 "SELECT * FROM telegram_chat_state WHERE chat_id = ?", (chat_id,)
             )
-        await self.db.commit()
-        return dict(chat)
+            if not chat:
+                # Initialize with last_command_usage as NULL
+                await self.execute(
+                    """
+                    INSERT INTO telegram_chat_state
+                    (chat_id, is_bot_started, last_command_usage)
+                    VALUES (?, ?, NULL)
+                    """,
+                    (chat_id, False),
+                )
+                chat = await self.fetch_one(
+                    "SELECT * FROM telegram_chat_state WHERE chat_id = ?", (chat_id,)
+                )
+            return chat
+        except Exception as e:
+            self.logger.error(f"Error in get_chat_state: {e}")
+            raise
 
     async def update_chat_state(self, chat_id: int, state: dict) -> dict:
         """Update chat state"""
-        set_clause = ", ".join([f"{k} = ?" for k in state.keys()])
-        values = list(state.values()) + [chat_id]
+        try:
+            set_clause = ", ".join([f"{k} = ?" for k in state.keys()])
+            values = list(state.values()) + [chat_id]
 
-        await self.execute(
-            f"""
-            UPDATE telegram_chat_state
-            SET {set_clause}, updated_at = CURRENT_TIMESTAMP
-            WHERE chat_id = ?
-            """,
-            values,
-        )
-        return await self.get_chat_state(chat_id)
+            await self.execute(
+                f"""
+                UPDATE telegram_chat_state
+                SET {set_clause}, updated_at = CURRENT_TIMESTAMP
+                WHERE chat_id = ?
+                """,
+                values,
+            )
+            return await self.get_chat_state(chat_id)
+        except Exception as e:
+            self.logger.error(f"Error updating chat state: {e}")
+            raise
 
     async def __aenter__(self):
         if not self.conn:
-            await self.initialize(self.db_path)
+            await self.initialize(self.db_path or "bot.db")
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
@@ -331,10 +338,14 @@ class DatabaseService:
 
     async def get_admin_users(self) -> List[int]:
         """Fetch admin user IDs from the database."""
-        async with aiosqlite.connect(self.db_path) as db:
-            cursor = await db.execute("SELECT user_id FROM users WHERE is_admin = 1")
-            rows = await cursor.fetchall()
-            return [row[0] for row in rows]
+        try:
+            rows = await self.fetch_all(
+                "SELECT user_id FROM telegram_user WHERE is_admin = 1"
+            )
+            return [row["user_id"] for row in rows]
+        except Exception as e:
+            self.logger.error(f"Error fetching admin users: {e}")
+            return []
 
 
 db_service = DatabaseService()  # Single instance
