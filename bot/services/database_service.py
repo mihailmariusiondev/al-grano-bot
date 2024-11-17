@@ -22,7 +22,7 @@ class DatabaseService:
     @property
     def closed(self) -> bool:
         """Check if database connection is closed"""
-        return self.conn is None or self.conn.closed
+        return self.conn is None
 
     async def initialize(self, db_path: str = "bot.db"):
         """Initialize database connection and create tables"""

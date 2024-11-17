@@ -60,13 +60,11 @@ class TelegramBot:
 
         self.logger.info("All handlers registered successfully")
 
-    async def start(self):
+    def start(self):
         if not self.initialized:
             raise RuntimeError("Telegram bot not initialized")
-
         try:
             self.logger.info("Starting bot initialization...")
-
             self.application = (
                 ApplicationBuilder()
                 .token(self.token)
@@ -75,12 +73,9 @@ class TelegramBot:
                 .connect_timeout(30)
                 .build()
             )
-
             self.register_handlers()
-
             self.logger.info("Starting bot polling...")
-            await self.application.run_polling()
-
+            self.application.run_polling()
         except Exception as e:
             self.logger.error(f"Failed to start bot: {e}", exc_info=True)
             raise

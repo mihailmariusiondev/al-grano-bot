@@ -3,11 +3,12 @@ from dotenv import load_dotenv
 from bot.utils.logger import logger
 from bot.bot import telegram_bot
 from bot.services.database_service import db_service
-from bot.config import config  # Importamos la instancia
+from bot.config import config
 
 logger = logger.get_logger(__name__)
 
-async def main():
+
+def main():
     try:
         # Load environment variables
         load_dotenv()
@@ -22,30 +23,31 @@ async def main():
 
         logger.info("Starting Telegram Bot application...")
 
-        # Initialize database
-        await db_service.initialize(config.DB_PATH)
+        # Initialize database asynchronously
+        asyncio.run(db_service.initialize(config.DB_PATH))
 
         # Initialize and start the bot
-        telegram_bot.initialize(
-            config.BOT_TOKEN, config.OPENAI_API_KEY
-        )
+        telegram_bot.initialize(config.BOT_TOKEN, config.OPENAI_API_KEY)
+        telegram_bot.start()
 
-        await telegram_bot.start()
     except Exception as e:
         logger.error(f"Application failed to start: {e}", exc_info=True)
         raise
+
     finally:
+        # Stop the bot if needed
         try:
-            await telegram_bot.stop()
+            telegram_bot.stop()
         except Exception as e:
             logger.error(f"Error stopping telegram bot: {e}")
 
+        # Close database connection asynchronously
         if not db_service.closed:
             try:
-                await db_service.close()
+                asyncio.run(db_service.close())
             except Exception as e:
                 logger.error(f"Error closing database: {e}")
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()
