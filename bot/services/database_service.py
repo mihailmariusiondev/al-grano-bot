@@ -1,5 +1,7 @@
 import aiosqlite
 from typing import Optional, List, Dict
+
+from bot.utils.constants import MAX_RECENT_MESSAGES
 from ..utils.logger import logger
 
 
@@ -103,6 +105,23 @@ class DatabaseService:
                 FOR EACH ROW
                 BEGIN
                     UPDATE telegram_message SET updated_at = CURRENT_TIMESTAMP WHERE id = OLD.id;
+                END;
+                """
+            )
+            # Crear trigger para limpiar mensajes antiguos después de insertar uno nuevo
+            await self.conn.execute(
+                f"""
+                CREATE TRIGGER IF NOT EXISTS cleanup_old_messages
+                AFTER INSERT ON telegram_message
+                BEGIN
+                    DELETE FROM telegram_message
+                    WHERE chat_id = NEW.chat_id
+                    AND id NOT IN (
+                        SELECT id FROM telegram_message
+                        WHERE chat_id = NEW.chat_id
+                        ORDER BY telegram_message_id DESC
+                        LIMIT {MAX_RECENT_MESSAGES}
+                    );
                 END;
                 """
             )
