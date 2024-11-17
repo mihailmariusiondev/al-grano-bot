@@ -30,7 +30,6 @@ class DatabaseService:
             self.db_path = db_path
             self.conn = await aiosqlite.connect(db_path)
             self.conn.row_factory = aiosqlite.Row
-
             # Create tables
             await self.conn.execute(
                 """
@@ -40,13 +39,23 @@ class DatabaseService:
                     first_name TEXT,
                     last_name TEXT,
                     is_premium BOOLEAN DEFAULT FALSE,
+                    is_admin BOOLEAN DEFAULT FALSE,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    is_admin BOOLEAN DEFAULT FALSE
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """
             )
-
+            # Crear trigger para actualizar 'updated_at' automáticamente en telegram_user
+            await self.conn.execute(
+                """
+                CREATE TRIGGER IF NOT EXISTS update_telegram_user_updated_at
+                AFTER UPDATE ON telegram_user
+                FOR EACH ROW
+                BEGIN
+                    UPDATE telegram_user SET updated_at = CURRENT_TIMESTAMP WHERE user_id = OLD.user_id;
+                END;
+                """
+            )
             await self.conn.execute(
                 """
                 CREATE TABLE IF NOT EXISTS telegram_chat_state (
@@ -58,7 +67,17 @@ class DatabaseService:
                 )
             """
             )
-
+            # Crear trigger para actualizar 'updated_at' automáticamente en telegram_chat_state
+            await self.conn.execute(
+                """
+                CREATE TRIGGER IF NOT EXISTS update_telegram_chat_state_updated_at
+                AFTER UPDATE ON telegram_chat_state
+                FOR EACH ROW
+                BEGIN
+                    UPDATE telegram_chat_state SET updated_at = CURRENT_TIMESTAMP WHERE chat_id = OLD.chat_id;
+                END;
+                """
+            )
             await self.conn.execute(
                 """
                 CREATE TABLE IF NOT EXISTS telegram_message (
@@ -70,15 +89,25 @@ class DatabaseService:
                     telegram_reply_to_message_id INTEGER,
                     message_type TEXT,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     FOREIGN KEY (chat_id) REFERENCES telegram_chat_state(chat_id),
                     FOREIGN KEY (user_id) REFERENCES telegram_user(user_id)
                 )
             """
             )
-
+            # Crear trigger para actualizar 'updated_at' automáticamente en telegram_message
+            await self.conn.execute(
+                """
+                CREATE TRIGGER IF NOT EXISTS update_telegram_message_updated_at
+                AFTER UPDATE ON telegram_message
+                FOR EACH ROW
+                BEGIN
+                    UPDATE telegram_message SET updated_at = CURRENT_TIMESTAMP WHERE id = OLD.id;
+                END;
+                """
+            )
             await self.conn.commit()
             self.logger.info("Database initialized successfully")
-
         except Exception as e:
             self.logger.error(f"Failed to initialize database: {e}")
             raise
@@ -89,7 +118,6 @@ class DatabaseService:
         """Execute a query (INSERT, UPDATE, DELETE)"""
         if not self.conn:
             raise RuntimeError("Database not initialized")
-
         try:
             async with self.conn.cursor() as cursor:
                 await cursor.execute(query, params)
@@ -109,7 +137,6 @@ class DatabaseService:
         """Fetch a single row from the database"""
         if not self.conn:
             raise RuntimeError("Database not initialized")
-
         async with self.conn.execute(query, params) as cursor:
             result = await cursor.fetchone()
             return dict(result) if result else None
@@ -118,7 +145,6 @@ class DatabaseService:
         """Fetch all rows from the database"""
         if not self.conn:
             raise RuntimeError("Database not initialized")
-
         async with self.conn.execute(query, params) as cursor:
             rows = await cursor.fetchall()
             return [dict(row) for row in rows]
@@ -204,7 +230,6 @@ class DatabaseService:
             user = await self.fetch_one(
                 "SELECT * FROM telegram_user WHERE user_id = ?", (user_id,)
             )
-
             if user:
                 # Compare existing values with new values safely
                 needs_update = False
@@ -217,25 +242,25 @@ class DatabaseService:
                         return False
                     return old_val != new_val
 
-                # Check each field for updates
+                # Check cada campo para actualizaciones
                 if values_different(user["username"], username):
                     update_fields.append("username = ?")
                     update_values.append(username)
                     needs_update = True
-
                 if values_different(user["first_name"], first_name):
                     update_fields.append("first_name = ?")
                     update_values.append(first_name)
                     needs_update = True
-
                 if values_different(user["last_name"], last_name):
                     update_fields.append("last_name = ?")
                     update_values.append(last_name)
                     needs_update = True
 
-                # Update user if needed
+                # Actualizar usuario si es necesario
                 if needs_update:
-                    update_values.append(user_id)  # Add user_id for WHERE clause
+                    update_values.append(
+                        user_id
+                    )  # Añadir user_id para la cláusula WHERE
                     update_query = f"""
                         UPDATE telegram_user
                         SET {", ".join(update_fields)}, updated_at = CURRENT_TIMESTAMP
@@ -245,16 +270,13 @@ class DatabaseService:
                     self.logger.info(
                         f"User {user_id} updated with fields: {', '.join(update_fields)}"
                     )
-
-                    # Fetch updated user data
+                    # Obtener datos actualizados del usuario
                     user = await self.fetch_one(
                         "SELECT * FROM telegram_user WHERE user_id = ?", (user_id,)
                     )
-
                 return user
-
             else:
-                # Create new user
+                # Crear nuevo usuario
                 insert_query = """
                     INSERT INTO telegram_user (
                         user_id, username, first_name, last_name
@@ -264,13 +286,11 @@ class DatabaseService:
                     insert_query, (user_id, username, first_name, last_name)
                 )
                 self.logger.info(f"New user created: {user_id}")
-
-                # Fetch and return the newly created user
+                # Obtener y retornar el usuario recién creado
                 user = await self.fetch_one(
                     "SELECT * FROM telegram_user WHERE user_id = ?", (user_id,)
                 )
                 return user
-
         except Exception as e:
             self.logger.error(f"Error in get_or_create_user: {e}")
             raise
@@ -292,7 +312,7 @@ class DatabaseService:
                 "SELECT * FROM telegram_chat_state WHERE chat_id = ?", (chat_id,)
             )
             if not chat:
-                # Initialize with last_command_usage as NULL
+                # Inicializar con last_command_usage como NULL
                 await self.execute(
                     """
                     INSERT INTO telegram_chat_state
@@ -314,7 +334,6 @@ class DatabaseService:
         try:
             set_clause = ", ".join([f"{k} = ?" for k in state.keys()])
             values = list(state.values()) + [chat_id]
-
             await self.execute(
                 f"""
                 UPDATE telegram_chat_state
