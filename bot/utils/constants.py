@@ -1,24 +1,22 @@
 import re
+from typing import List
 
-# Regular expression to match YouTube video IDs
+# Regular expressions
 YOUTUBE_REGEX = re.compile(
     r"(?:https?:\/\/)?(?:www\.)?(?:youtube\.com|youtu\.be)\/(?:watch\?v=)?(?:embed\/)?(?:v\/)?(?:shorts\/)?(?:live\/)?(?:[\w\-]{11})"
 )
-
-# Regular expression to match article URLs
 ARTICLE_URL_REGEX = re.compile(r"https?:\/\/\S+")
 
-# Maximum size for a single message chunk (in characters)
-CHUNK_SIZE = 4096
+# Message handling
+CHUNK_SIZE = 4096  # Maximum characters per message
+PAUSE_BETWEEN_CHUNKS = 0.5  # Seconds between message chunks
+MAX_RECENT_MESSAGES = 300  # Maximum messages to fetch for summarization
 
-# Delay between sending chunks of messages (in seconds)
-PAUSE_BETWEEN_CHUNKS = 0.5
-
-# Maximum file size for audio/video processing (20 MB in bytes)
-MAX_FILE_SIZE = 20 * 1024 * 1024
+# File handling
+MAX_FILE_SIZE = 20 * 1024 * 1024  # 20MB in bytes
 
 # Supported MIME types
-SUPPORTED_AUDIO_TYPES = [
+SUPPORTED_AUDIO_TYPES: List[str] = [
     "audio/mpeg",
     "audio/mp4",
     "audio/ogg",
@@ -27,7 +25,7 @@ SUPPORTED_AUDIO_TYPES = [
     "audio/x-wav",
 ]
 
-SUPPORTED_VIDEO_TYPES = [
+SUPPORTED_VIDEO_TYPES: List[str] = [
     "video/mp4",
     "video/mpeg",
     "video/ogg",
@@ -35,15 +33,9 @@ SUPPORTED_VIDEO_TYPES = [
     "video/quicktime",
 ]
 
-SUPPORTED_DOCUMENT_TYPES = [
+SUPPORTED_DOCUMENT_TYPES: List[str] = [
     "text/plain",
     "application/pdf",
     "application/msword",
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
 ]
-
-# Message limits
-MAX_FILE_SIZE = 20 * 1024 * 1024  # 20MB in bytes
-PAUSE_BETWEEN_CHUNKS = 0.5  # Seconds between message chunks
-MAX_RECENT_MESSAGES = 300  # Maximum number of recent messages to fetch for summarization
-
