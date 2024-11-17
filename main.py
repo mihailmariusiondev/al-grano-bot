@@ -26,6 +26,10 @@ def main():
         # Initialize database asynchronously
         asyncio.run(db_service.initialize(config.DB_PATH))
 
+        # Add the following lines to set a new event loop
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+
         # Initialize and start the bot
         telegram_bot.initialize(config.BOT_TOKEN, config.OPENAI_API_KEY)
         telegram_bot.start()
@@ -37,7 +41,8 @@ def main():
     finally:
         # Stop the bot if needed
         try:
-            telegram_bot.stop()
+            # Await the stop coroutine properly
+            asyncio.run(telegram_bot.stop())
         except Exception as e:
             logger.error(f"Error stopping telegram bot: {e}")
 
