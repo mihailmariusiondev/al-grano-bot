@@ -66,11 +66,18 @@ def admin_command(func=None):
 
 
 def cooldown(seconds: int):
-    """Cooldown based on last_command_usage in chat state"""
+    """Cooldown based on last_command_usage in chat state, skips for admin users"""
 
     def decorator(func):
         @wraps(func)
         async def wrapped(update: Update, context: ContextTypes.DEFAULT_TYPE):
+            # Check if user is admin first
+            user_id = update.effective_user.id
+            admin_users = await db_service.get_admin_users()
+            if user_id in admin_users:
+                return await func(update, context)
+
+            # Continue with normal cooldown logic for non-admin users
             chat_id = update.effective_chat.id
             chat_state = await db_service.get_chat_state(chat_id)
 
@@ -87,7 +94,7 @@ def cooldown(seconds: int):
                 await update.message.reply_text(f"{cooldown_message} ({remaining}s)")
                 return
 
-            # Actualizar last_command_usage
+            # Update last_command_usage
             await db_service.update_chat_state(
                 chat_id, {"last_command_usage": current_time.isoformat()}
             )
