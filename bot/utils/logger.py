@@ -13,6 +13,11 @@ class Logger:
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super().__new__(cls)
+            cls._instance.log_level = logging.INFO
+            cls._instance.log_dir = None
+            cls._instance.log_format = "%(asctime)s - %(name)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s"
+            cls._instance.max_file_size = 10 * 1024 * 1024
+            cls._instance.backup_count = 5
             cls._instance._init_logger()
         return cls._instance
 
@@ -32,10 +37,6 @@ class Logger:
             # Si DEBUG_MODE está activo, forzar nivel DEBUG
             if os.getenv('DEBUG_MODE', 'false').lower() == 'true':
                 self.log_level = logging.DEBUG
-
-            self.max_file_size = 10 * 1024 * 1024  # 10MB
-            self.backup_count = 5
-            self.log_format = "%(asctime)s - %(name)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s"
 
             # Log inicial para verificar la configuración
             root_logger = logging.getLogger()
