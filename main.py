@@ -22,6 +22,7 @@ def main():
             logger.warning("OPENAI_API_KEY not set. AI features will be disabled.")
 
         logger.info("Starting Telegram Bot application...")
+        logger.info(f"Initializing database with path: {config.DB_PATH}")
 
         # Initialize database asynchronously
         asyncio.run(db_service.initialize(config.DB_PATH))
