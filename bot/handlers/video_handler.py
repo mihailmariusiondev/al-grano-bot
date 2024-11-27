@@ -37,12 +37,12 @@ async def video_handler(message: Message, context: CallbackContext) -> None:
             logging.warning(
                 f"Video size {file_size} exceeds limit of {MAX_FILE_SIZE} bytes"
             )
-            await message.chat.send_message(
+            await message.reply_text(
                 "El archivo es demasiado grande (más de 20 MB). Por favor, envía un archivo más pequeño."
             )
-            return
+            return None
 
-        await message.chat.send_message("Procesando el video, por favor espera...")
+        await message.reply_text("Procesando el video, por favor espera...")
 
         # Create temporary files with context management
         temp_files = []
@@ -66,38 +66,60 @@ async def video_handler(message: Message, context: CallbackContext) -> None:
             )
 
             # Get video file from Telegram
-            file = await context.bot.get_file(file_id)
-            logging.info(f"Retrieved file info: {file.file_path}")
+            try:
+                file = await context.bot.get_file(file_id)
+                logging.info(f"Retrieved file info: {file.file_path}")
+                await file.download_to_drive(custom_path=temp_file.name)
+                logging.info(
+                    f"Video downloaded successfully, size: {get_file_size(temp_file.name)}"
+                )
+            except Exception as e:
+                logging.error(f"Error downloading video: {str(e)}", exc_info=True)
+                await message.reply_text(
+                    "Hubo un problema al descargar el video. Por favor, inténtalo de nuevo."
+                )
+                return None
 
-            # Download video
-            await file.download_to_drive(custom_path=temp_file.name)
-            logging.info(
-                f"Video downloaded successfully, size: {get_file_size(temp_file.name)}"
-            )
+            try:
+                # Extract and process audio
+                await extract_audio(temp_file.name, audio_file.name)
+                logging.info(f"Audio extracted, size: {get_file_size(audio_file.name)}")
+                await compress_audio(audio_file.name, compressed_file.name)
+                logging.info(
+                    f"Audio compressed, size: {get_file_size(compressed_file.name)}"
+                )
+            except Exception as e:
+                logging.error(
+                    f"Error processing audio from video: {str(e)}", exc_info=True
+                )
+                await message.reply_text(
+                    "Hubo un problema al procesar el audio del video. Por favor, inténtalo de nuevo."
+                )
+                return None
 
-            # Extract audio from video
-            await extract_audio(temp_file.name, audio_file.name)
-            logging.info(f"Audio extracted, size: {get_file_size(audio_file.name)}")
-
-            # Compress extracted audio
-            await compress_audio(audio_file.name, compressed_file.name)
-            logging.info(
-                f"Audio compressed, size: {get_file_size(compressed_file.name)}"
-            )
-
-            # Transcribe audio
-            logging.info("Starting transcription process")
-            transcription = await openai_service.transcribe_audio(compressed_file.name)
-            logging.info(f"Transcription completed, length: {len(transcription)} chars")
-
-            return transcription
+            try:
+                # Transcribe audio
+                logging.info("Starting transcription process")
+                transcription = await openai_service.transcribe_audio(
+                    compressed_file.name
+                )
+                logging.info(
+                    f"Transcription completed, length: {len(transcription)} chars"
+                )
+                return transcription
+            except Exception as e:
+                logging.error(f"Error transcribing audio: {str(e)}", exc_info=True)
+                await message.reply_text(
+                    "No pude transcribir el audio del video. Por favor, inténtalo de nuevo."
+                )
+                return None
 
     except Exception as e:
-        logging.error(f"Error processing video: {str(e)}", exc_info=True)
+        logging.error(f"Error in video handler: {str(e)}", exc_info=True)
         await message.reply_text(
-            "Ocurrió un error al procesar la transcripción del video."
+            "Ocurrió un error inesperado al procesar el video. Por favor, inténtalo de nuevo."
         )
-        raise
+        return None
 
     finally:
         # Clean up temporary files

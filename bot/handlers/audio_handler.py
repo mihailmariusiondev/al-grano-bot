@@ -16,80 +16,83 @@ async def audio_handler(message: Message, context: CallbackContext) -> None:
         message: Telegram message containing audio/voice
         context: Callback context
     """
-    chat_id = message.chat.id
-    user_id = message.from_user.id
-
-    # Determine file details based on message type
-    is_audio = bool(message.audio)
-    file_id = message.audio.file_id if is_audio else message.voice.file_id
-    file_size = message.audio.file_size if is_audio else message.voice.file_size
-
-    logging.info(
-        f"Processing {'audio' if is_audio else 'voice'} message from user {user_id}, file_id: {file_id}"
-    )
-    logging.info(f"File size: {file_size} bytes")
-
-    # Check file size limit
-    if file_size > MAX_FILE_SIZE:
-        logging.warning(f"File size {file_size} exceeds limit of {MAX_FILE_SIZE} bytes")
-        await message.chat.send_message(
-            "El archivo es demasiado grande (más de 20 MB) para resumir."
-        )
-        return
-
     try:
-        # Get file from Telegram
-        file = await context.bot.get_file(file_id)
-        logging.info(f"Retrieved file info: {file.file_path}")
+        chat_id = message.chat.id
+        user_id = message.from_user.id
+        is_audio = bool(message.audio)
+        file_id = message.audio.file_id if is_audio else message.voice.file_id
+        file_size = message.audio.file_size if is_audio else message.voice.file_size
 
-        # Use ExitStack to manage multiple temporary files
-        with ExitStack() as stack:
-            # Create temporary files that will be automatically cleaned up
-            temp_file = stack.enter_context(
-                tempfile.NamedTemporaryFile(suffix=".ogg", delete=False)
+        logging.info(
+            f"Processing {'audio' if is_audio else 'voice'} message from user {user_id}, file_id: {file_id}"
+        )
+        logging.info(f"File size: {file_size} bytes")
+
+        if file_size > MAX_FILE_SIZE:
+            logging.warning(
+                f"File size {file_size} exceeds limit of {MAX_FILE_SIZE} bytes"
             )
-            compressed_file = stack.enter_context(
-                tempfile.NamedTemporaryFile(suffix=".ogg", delete=False)
+            await message.reply_text(
+                "El archivo es demasiado grande (más de 20 MB). Por favor, envía un archivo más pequeño."
             )
+            return None
 
-            temp_file_path = temp_file.name
-            compressed_file_path = compressed_file.name
+        try:
+            file = await context.bot.get_file(file_id)
+            logging.info(f"Retrieved file info: {file.file_path}")
 
-            logging.info(
-                f"Created temporary files: {temp_file_path}, {compressed_file_path}"
+            with ExitStack() as stack:
+                temp_file = stack.enter_context(
+                    tempfile.NamedTemporaryFile(suffix=".ogg", delete=False)
+                )
+                compressed_file = stack.enter_context(
+                    tempfile.NamedTemporaryFile(suffix=".ogg", delete=False)
+                )
+                temp_file_path = temp_file.name
+                compressed_file_path = compressed_file.name
+
+                logging.info(
+                    f"Created temporary files: {temp_file_path}, {compressed_file_path}"
+                )
+
+                try:
+                    await file.download_to_drive(custom_path=temp_file_path)
+                    logging.info(
+                        f"Audio downloaded successfully, size: {get_file_size(temp_file_path)}"
+                    )
+
+                    await compress_audio(temp_file_path, compressed_file_path)
+                    logging.info(
+                        f"Audio compressed, new size: {get_file_size(compressed_file_path)}"
+                    )
+
+                    transcription = await openai_service.transcribe_audio(
+                        compressed_file_path
+                    )
+                    logging.info(
+                        f"Transcription completed, length: {len(transcription)} chars"
+                    )
+                    return transcription
+
+                except Exception as e:
+                    logging.error(
+                        f"Error processing audio file: {str(e)}", exc_info=True
+                    )
+                    await message.reply_text(
+                        "Ocurrió un error al procesar el audio. Por favor, inténtalo de nuevo."
+                    )
+                    return None
+
+        except Exception as e:
+            logging.error(f"Error getting file: {str(e)}", exc_info=True)
+            await message.reply_text(
+                "No pude acceder al archivo de audio. Por favor, inténtalo de nuevo."
             )
-
-            try:
-                # Download audio file
-                await file.download_to_drive(custom_path=temp_file_path)
-                logging.info(
-                    f"Audio downloaded successfully, size: {get_file_size(temp_file_path)}"
-                )
-
-                # Compress audio
-                await compress_audio(temp_file_path, compressed_file_path)
-                logging.info(
-                    f"Audio compressed, new size: {get_file_size(compressed_file_path)}"
-                )
-
-                # Transcribe audio
-                logging.info("Starting transcription process")
-                transcription = await openai_service.transcribe_audio(
-                    compressed_file_path
-                )
-                logging.info(
-                    f"Transcription completed, length: {len(transcription)} chars"
-                )
-
-                return transcription
-
-            except Exception as e:
-                logging.error(f"Error processing audio file: {str(e)}", exc_info=True)
-                await message.reply_text(
-                    "Ocurrió un error al procesar la transcripción del audio."
-                )
-                raise
+            return None
 
     except Exception as e:
         logging.error(f"Error in audio handler: {str(e)}", exc_info=True)
-        raise
+        await message.reply_text(
+            "Ocurrió un error inesperado. Por favor, inténtalo de nuevo."
+        )
+        return None

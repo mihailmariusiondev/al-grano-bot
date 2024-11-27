@@ -21,7 +21,10 @@ async def document_handler(message, context) -> Optional[str]:
         if document.mime_type not in SUPPORTED_DOCUMENT_TYPES:
             error_msg = f"Tipo de documento no soportado: {document.mime_type}"
             logger.warning(error_msg)
-            raise ValueError(error_msg)
+            await message.reply_text(
+                "Lo siento, este tipo de documento no está soportado. Por favor, envía un PDF, DOCX o TXT."
+            )
+            return None
 
         logger.info(
             f"Procesando documento: {document.file_name} ({document.mime_type})"
@@ -35,7 +38,10 @@ async def document_handler(message, context) -> Optional[str]:
         except Exception as e:
             error_msg = f"Error descargando el documento: {str(e)}"
             logger.error(error_msg, exc_info=True)
-            raise ValueError(error_msg)
+            await message.reply_text(
+                "Lo siento, hubo un problema al descargar el documento. Por favor, inténtalo de nuevo."
+            )
+            return None
 
         # Extract text based on file type
         try:
@@ -50,9 +56,11 @@ async def document_handler(message, context) -> Optional[str]:
                 text_content = file_bytes.decode("utf-8")
 
             if not text_content or not text_content.strip():
-                error_msg = "No se pudo extraer texto del documento"
-                logger.error(error_msg)
-                raise ValueError(error_msg)
+                logger.error("No se pudo extraer texto del documento")
+                await message.reply_text(
+                    "No pude extraer texto de este documento. ¿Podrías verificar que no esté vacío o dañado?"
+                )
+                return None
 
             logger.info(
                 f"Texto extraído exitosamente, longitud: {len(text_content)} caracteres"
@@ -62,14 +70,17 @@ async def document_handler(message, context) -> Optional[str]:
         except Exception as e:
             error_msg = f"Error extrayendo texto del documento: {str(e)}"
             logger.error(error_msg, exc_info=True)
-            raise ValueError(error_msg)
+            await message.reply_text(
+                "Hubo un problema al procesar el documento. ¿Podrías intentar con otro archivo?"
+            )
+            return None
 
     except Exception as e:
         logger.error(f"Error en document handler: {str(e)}", exc_info=True)
-        # Propagar el error con un mensaje más descriptivo
-        if isinstance(e, ValueError):
-            raise
-        raise ValueError(f"Error procesando el documento: {str(e)}")
+        await message.reply_text(
+            "Ocurrió un error inesperado al procesar el documento. Por favor, inténtalo de nuevo."
+        )
+        return None
 
 
 def extract_text_from_pdf(file_bytes: bytearray) -> str:
