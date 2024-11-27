@@ -11,7 +11,14 @@
   "ignore": {
     "useGitignore": true,
     "useDefaultPatterns": true,
-    "customPatterns": [".gitignore", "repopack.config.json", ".cursorrules", "prompts", "README.md"]
+    "customPatterns": [
+      ".gitignore",
+      "repopack.config.json",
+      ".cursorrules",
+      "prompts",
+      "README.md",
+      "LICENSE"
+    ]
   },
   "security": {
     "enableSecurityCheck": true
