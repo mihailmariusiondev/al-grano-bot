@@ -165,6 +165,28 @@ class OpenAIService:
                        "🎥 RESUMEN DE VIDEO CIRCULAR:
                        [concise summary of the video note content]"
                     - (VERY IMPORTANT) Should be in {lang}""",
+                "photo": lambda lang, _: f"""You are an expert image analyzer. Your task is to:
+                    1. Provide a detailed description of the image content
+                    2. Focus on observable elements and maintain objectivity
+                    3. Structure your analysis as follows:
+                       - General overview
+                       - Main subjects/elements
+                       - Notable details (colors, lighting, composition)
+                       - Context or setting
+                       - Mood/atmosphere (if relevant)
+                    4. Format:
+                       "🖼️ ANÁLISIS DE IMAGEN:
+                       📍 DESCRIPCIÓN GENERAL:
+                       [general overview]
+                       👥 ELEMENTOS PRINCIPALES:
+                       [main elements]
+                       ✨ DETALLES DESTACADOS:
+                       [notable details]
+                       📝 CONTEXTO:
+                       [setting/context]
+                       🎭 AMBIENTE:
+                       [mood/atmosphere]"
+                    5. (VERY IMPORTANT) Response should be in {lang}""",
             }
 
     async def chat_completion(
@@ -218,6 +240,7 @@ class OpenAIService:
             "web_article",
             "poll",
             "document",
+            "photo",
         ],
         language: str = "Spanish",
         model: str = "gpt-4o",
@@ -225,14 +248,11 @@ class OpenAIService:
         """Generate a summary using the specified model"""
         try:
             prompt = self.SUMMARY_PROMPTS[summary_type](language, content)
-
             messages = [
                 {"role": "system", "content": prompt},
                 {"role": "user", "content": content},
             ]
-
-            response = await self.chat_completion(messages, model=model)
-            return response
+            return await self.chat_completion(messages, model=model)
 
         except Exception as e:
             self.logger.error(f"Summary generation failed: {e}", exc_info=True)

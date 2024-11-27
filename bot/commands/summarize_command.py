@@ -17,6 +17,7 @@ from bot.handlers.video_handler import video_handler
 from bot.handlers.audio_handler import audio_handler
 from bot.handlers.article_handler import article_handler
 from bot.handlers.document_handler import document_handler
+from bot.handlers.photo_handler import photo_handler
 import random
 import asyncio
 
@@ -202,12 +203,9 @@ async def summarize_command(update: Update, context: CallbackContext):
                         summary_type = "document"
 
             case "photo":
-                if reply_msg.caption:
-                    content = reply_msg.caption
-                    summary_type = "quoted_message"
-                else:
-                    await wait_message.edit_text(ERROR_MESSAGES["ERROR_NO_CAPTION"])
-                    return
+                await update_progress(wait_message, PROGRESS_MESSAGES["ANALYZING"])
+                content = await photo_handler(reply_msg, context)
+                summary_type = "photo"
 
             case "poll":
                 await update_progress(wait_message, PROGRESS_MESSAGES["PROCESSING"])
