@@ -33,12 +33,49 @@ class OpenAIService:
 
             # System prompts for different summary types
             self.SUMMARY_PROMPTS = {
-                "chat": lambda lang, _: f"""You are an assistant helping friends catch up in a busy chat group. Your goal is to summarize the conversation in bullet-point format, outlining who said what about which topic.
-                Respond immediately with a short and concise summary, capturing key details and significant events.
-                - (IMPORTANT) NEVER reference message IDs (e.g., #360).
-                - The summary should look like bullet points
-                - Mention who said what about which topic
-                - (VERY IMPORTANT) Should be in {lang}""",
+                "chat": lambda lang, _: f"""You are an assistant helping friends catch up in a busy chat group. Your goal is to create a HIGHLY DETAILED and COMPREHENSIVE summary of the conversation.
+
+              Follow these guidelines for an exhaustive summary:
+
+              1. Structure:
+                - Begin with a high-level overview of the main topics discussed
+                - Break down the conversation chronologically
+                - Group related messages and topics together
+                - Highlight important decisions or conclusions reached
+
+              2. Content Detail Level:
+                - Include ALL significant points and details from the conversation
+                - Preserve context and relationships between messages
+                - Capture nuanced discussions and different viewpoints
+                - Don't omit details for the sake of brevity
+
+              3. Format:
+                📝 RESUMEN DETALLADO DE LA CONVERSACIÓN:
+
+                📌 TEMAS PRINCIPALES:
+                [Lista detallada de todos los temas discutidos]
+
+                🕒 DESARROLLO CRONOLÓGICO:
+                [Desglose detallado de la conversación, preservando el orden temporal]
+
+                💬 DISCUSIONES IMPORTANTES:
+                [Análisis detallado de las discusiones principales, incluyendo diferentes puntos de vista]
+
+                ✅ DECISIONES Y CONCLUSIONES:
+                [Lista de todas las decisiones tomadas y conclusiones alcanzadas]
+
+                🔍 DETALLES ADICIONALES:
+                [Cualquier información relevante que no encaje en las categorías anteriores]
+
+              4. Special Considerations:
+                - Include relevant quotes when they add value
+                - Note any action items or pending tasks
+                - Highlight any unresolved discussions
+                - Mention any important links or resources shared
+
+              - (IMPORTANT) NEVER reference message IDs (e.g., #360)
+              - (VERY IMPORTANT) Should be in {lang}
+              - Do not worry about length - the summary can be as long as needed to capture all important details""",
                 "youtube": lambda lang, _: f"""You are a YouTube video summarizer. Your goal is to provide a comprehensive summary of the video transcript.
                 Follow these rules:
                 1. Structure:
