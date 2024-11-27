@@ -143,100 +143,126 @@ async def summarize_command(update: Update, context: CallbackContext):
         content = None
         summary_type = None
 
-        # Handle different message types
-        match message_type:
-            case "text":
-                await update_progress(wait_message, PROGRESS_MESSAGES["ANALYZING"])
-                text = reply_msg.text or ""
+        try:
+            # Handle different message types
+            match message_type:
+                case "text":
+                    await update_progress(wait_message, PROGRESS_MESSAGES["ANALYZING"])
+                    text = reply_msg.text or ""
 
-                if YOUTUBE_REGEX.search(text):
+                    if YOUTUBE_REGEX.search(text):
+                        await update_progress(
+                            wait_message, PROGRESS_MESSAGES["DOWNLOADING"]
+                        )
+                        content = await youtube_handler(update, context, text)
+                        summary_type = "youtube"
+                    elif ARTICLE_URL_REGEX.search(text):
+                        await update_progress(
+                            wait_message, PROGRESS_MESSAGES["DOWNLOADING"]
+                        )
+                        content = await article_handler(text)
+                        summary_type = "web_article"
+                    else:
+                        content = text
+                        summary_type = "quoted_message"
+
+                case "voice" | "audio":
                     await update_progress(
                         wait_message, PROGRESS_MESSAGES["DOWNLOADING"]
                     )
-                    content = await youtube_handler(update, context, text)
-                    summary_type = "youtube"
-                elif ARTICLE_URL_REGEX.search(text):
+                    await update_progress(
+                        wait_message, PROGRESS_MESSAGES["TRANSCRIBING"]
+                    )
+                    content = await audio_handler(reply_msg, context)
+                    summary_type = (
+                        "voice_message" if message_type == "voice" else "audio_file"
+                    )
+
+                case "video" | "video_note":
                     await update_progress(
                         wait_message, PROGRESS_MESSAGES["DOWNLOADING"]
                     )
-                    content = await article_handler(text)
-                    summary_type = "web_article"
-                else:
-                    content = text
+                    await update_progress(wait_message, PROGRESS_MESSAGES["PROCESSING"])
+                    content = await video_handler(reply_msg, context)
+                    summary_type = (
+                        "video_note"
+                        if message_type == "video_note"
+                        else "telegram_video"
+                    )
+
+                case "document":
+                    await update_progress(wait_message, PROGRESS_MESSAGES["ANALYZING"])
+                    mime_type = reply_msg.document.mime_type
+                    if mime_type:
+                        try:
+                            content = await document_handler(reply_msg, context)
+                            if not content:
+                                raise ValueError(
+                                    "No se pudo extraer contenido del documento"
+                                )
+                            summary_type = "document"
+
+                            # Procesar el contenido extraído
+                            await update_progress(
+                                wait_message, PROGRESS_MESSAGES["SUMMARIZING"]
+                            )
+                            summary = await openai_service.summarize_large_document(
+                                content
+                            )
+                            await update_progress(
+                                wait_message, PROGRESS_MESSAGES["FINALIZING"]
+                            )
+                            await send_long_message(update, summary)
+                            return
+
+                        except Exception as e:
+                            logger.error(
+                                f"Error procesando documento: {str(e)}", exc_info=True
+                            )
+                            await wait_message.edit_text(
+                                f"Error procesando el documento: {str(e)}"
+                            )
+                            return
+
+                case "photo":
+                    await update_progress(wait_message, PROGRESS_MESSAGES["ANALYZING"])
+                    content = await photo_handler(reply_msg, context)
+                    summary_type = "photo"
+
+                case "poll":
+                    await update_progress(wait_message, PROGRESS_MESSAGES["PROCESSING"])
+                    options = [opt.text for opt in reply_msg.poll.options]
+                    content = f"Encuesta: {reply_msg.poll.question}\nOpciones: {', '.join(options)}"
                     summary_type = "quoted_message"
 
-            case "voice" | "audio":
-                await update_progress(wait_message, PROGRESS_MESSAGES["DOWNLOADING"])
-                await update_progress(wait_message, PROGRESS_MESSAGES["TRANSCRIBING"])
-                content = await audio_handler(reply_msg, context)
-                summary_type = (
-                    "voice_message" if message_type == "voice" else "audio_file"
-                )
+                case _:
+                    await wait_message.edit_text(
+                        f"No puedo resumir mensajes de tipo: {message_type}"
+                    )
+                    return
 
-            case "video" | "video_note":
-                await update_progress(wait_message, PROGRESS_MESSAGES["DOWNLOADING"])
-                await update_progress(wait_message, PROGRESS_MESSAGES["PROCESSING"])
-                content = await video_handler(reply_msg, context)
-                summary_type = "video_note" if message_type == "video_note" else "telegram_video"
-
-            case "document":
-                await update_progress(wait_message, PROGRESS_MESSAGES["ANALYZING"])
-                mime_type = reply_msg.document.mime_type
-                if mime_type:
-                    if mime_type.startswith("audio/"):
-                        await update_progress(
-                            wait_message, PROGRESS_MESSAGES["TRANSCRIBING"]
-                        )
-                        content = await audio_handler(reply_msg, context)
-                        summary_type = "audio_file"
-                    elif mime_type.startswith("video/"):
-                        await update_progress(
-                            wait_message, PROGRESS_MESSAGES["PROCESSING"]
-                        )
-                        content = await video_handler(reply_msg, context)
-                        summary_type = "telegram_video"
-                    elif mime_type in ["text/plain", "application/pdf"]:
-                        await update_progress(
-                            wait_message, PROGRESS_MESSAGES["PROCESSING"]
-                        )
-                        content = await document_handler(reply_msg, context)
-                        summary_type = "document"
-
-            case "photo":
-                await update_progress(wait_message, PROGRESS_MESSAGES["ANALYZING"])
-                content = await photo_handler(reply_msg, context)
-                summary_type = "photo"
-
-            case "poll":
-                await update_progress(wait_message, PROGRESS_MESSAGES["PROCESSING"])
-                options = [opt.text for opt in reply_msg.poll.options]
-                content = f"Encuesta: {reply_msg.poll.question}\nOpciones: {', '.join(options)}"
-                summary_type = "quoted_message"
-
-            case _:
+            if not content:
                 await wait_message.edit_text(
-                    f"No puedo resumir mensajes de tipo: {message_type}"
+                    ERROR_MESSAGES.get(
+                        f"ERROR_CANNOT_SUMMARIZE_{message_type.upper()}",
+                        ERROR_MESSAGES["ERROR_UNKNOWN"],
+                    )
                 )
                 return
 
-        if not content:
-            await wait_message.edit_text(
-                ERROR_MESSAGES.get(
-                    f"ERROR_CANNOT_SUMMARIZE_{message_type.upper()}",
-                    ERROR_MESSAGES["ERROR_UNKNOWN"],
-                )
-            )
+            # Generate summary
+            await update_progress(wait_message, PROGRESS_MESSAGES["SUMMARIZING"])
+            summary = await openai_service.get_summary(content, summary_type)
+
+            # Send the final summary
+            await update_progress(wait_message, PROGRESS_MESSAGES["FINALIZING"])
+            await send_long_message(update, summary)
+
+        except Exception as e:
+            logger.error(f"Error procesando mensaje: {str(e)}", exc_info=True)
+            await wait_message.edit_text(f"Error procesando el mensaje: {str(e)}")
             return
-
-        # Generate summary
-        await update_progress(wait_message, PROGRESS_MESSAGES["SUMMARIZING"])
-        summary = await openai_service.get_summary(content, summary_type)
-
-        # Send the final summary
-        await update_progress(wait_message, PROGRESS_MESSAGES["FINALIZING"])
-        await send_long_message(update, summary)
 
     except Exception as e:
         logger.error(f"Error in summarize_command: {e}", exc_info=True)
-        await update.message.reply_text(ERROR_MESSAGES["ERROR_SUMMARIZING"])
-        raise
+        await update.message.reply_text(f"Error al procesar la solicitud: {str(e)}")

@@ -1,5 +1,6 @@
 import openai
 from typing import List, Optional, Dict, Literal
+import asyncio
 
 from bot.utils.text_utils import chunk_text
 from bot.utils.logger import logger
@@ -7,6 +8,13 @@ from bot.utils.logger import logger
 
 class OpenAIService:
     _instance = None
+
+    # Actualizar constantes según la documentación
+    GPT4O_MAX_TOKENS = 128000  # Límite real de tokens de GPT-4o
+    CHARS_PER_TOKEN = 4  # Aproximación de caracteres por token
+    MAX_INPUT_CHARS = (
+        GPT4O_MAX_TOKENS * CHARS_PER_TOKEN * 0.75
+    )  # 75% del límite para dejar espacio para la respuesta
 
     def __new__(cls):
         if cls._instance is None:
@@ -261,31 +269,77 @@ class OpenAIService:
     async def summarize_large_document(
         self, text: str, language: str = "Spanish"
     ) -> str:
-        """Procesa documentos grandes en múltiples pasadas"""
+        """Procesa documentos grandes de manera más eficiente usando GPT-4o-mini para chunks"""
         try:
-            chunks = chunk_text(text)
+            text_length = len(text)
+            self.logger.info(
+                f"Iniciando procesamiento de documento de {text_length} caracteres"
+            )
 
-            chunk_summaries = []
-            for chunk in chunks:
-                summary = await self.get_summary(
+            # Si el texto es más corto que el límite máximo, procesarlo directamente con GPT-4o
+            if len(text) < self.MAX_INPUT_CHARS:
+                self.logger.info(
+                    f"Documento dentro del límite ({text_length}/{self.MAX_INPUT_CHARS}). "
+                    "Procesando directamente con GPT-4o"
+                )
+                return await self.get_summary(
+                    content=text,
+                    summary_type="document",
+                    language=language,
+                    model="gpt-4o",
+                )
+
+            # Para documentos más grandes, dividir en chunks
+            self.logger.info("Documento excede el límite. Dividiendo en chunks...")
+            chunks = chunk_text(text, chunk_size=int(self.MAX_INPUT_CHARS))
+            self.logger.info(f"Documento dividido en {len(chunks)} chunks")
+
+            # Procesar chunks en paralelo usando GPT-4o-mini para mayor eficiencia
+            self.logger.info(
+                "Iniciando procesamiento paralelo de chunks con GPT-4o-mini"
+            )
+            tasks = [
+                self.get_summary(
                     content=chunk,
                     summary_type="document",
                     language=language,
                     model="gpt-4o-mini",
                 )
-                chunk_summaries.append(summary)
+                for chunk in chunks
+            ]
 
-            if len(chunk_summaries) > 1:
-                final_summary = await self.get_summary(
-                    content="\n\n".join(chunk_summaries),
-                    summary_type="document",
-                    language=language,
-                    model="gpt-4o",
+            self.logger.info("Esperando resultados de todos los chunks...")
+            chunk_summaries = await asyncio.gather(*tasks)
+            self.logger.info(f"Procesados {len(chunk_summaries)} chunks exitosamente")
+
+            # Si solo hay un chunk después del resumen, retornarlo directamente
+            if len(chunk_summaries) == 1:
+                self.logger.info(
+                    "Solo un chunk procesado, retornando resumen directamente"
                 )
-                return final_summary
-            return chunk_summaries[0]
+                return chunk_summaries[0]
+
+            # Para el resumen final usar GPT-4o para mejor calidad
+            self.logger.info("Generando resumen final con GPT-4o")
+            combined_summaries = "\n\n".join(chunk_summaries)
+            self.logger.info(
+                f"Longitud total de resúmenes combinados: {len(combined_summaries)} caracteres"
+            )
+
+            final_summary = await self.get_summary(
+                content=combined_summaries,
+                summary_type="document",
+                language=language,
+                model="gpt-4o",
+            )
+
+            self.logger.info(
+                f"Resumen final generado. Longitud: {len(final_summary)} caracteres"
+            )
+            return final_summary
+
         except Exception as e:
-            self.logger.error(f"Error procesando documento grande: {e}")
+            self.logger.error(f"Error procesando documento grande: {e}", exc_info=True)
             raise
 
 
