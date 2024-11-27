@@ -3,9 +3,10 @@ from telegram.ext import ContextTypes
 from telegram.error import TelegramError, BadRequest, TimedOut, NetworkError, RetryAfter
 from ..utils.logger import logger
 from ..services import db_service
+import traceback
+import sys
 
 logger = logger.get_logger(__name__)
-
 
 async def notify_admins(context: ContextTypes.DEFAULT_TYPE, message: str):
     """Notify all admin users about an error."""
@@ -16,82 +17,128 @@ async def notify_admins(context: ContextTypes.DEFAULT_TYPE, message: str):
         except Exception as e:
             logger.error(f"Failed to notify admin {admin_id}: {e}")
 
-
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle errors in the telegram bot with detailed error categorization"""
+
+    # Get current system exception
+    exc_info = sys.exc_info()
+
+    # Log complete error information
+    logger.error(
+        "\n=== Error Details ===\n"
+        f"Error Type: {type(context.error).__name__}\n"
+        f"Error Message: {str(context.error)}\n"
+        f"Update: {update}\n"
+        f"Chat Data: {context.chat_data}\n"
+        f"User Data: {context.user_data}\n"
+        f"=== Full Traceback ===\n"
+        f"{''.join(traceback.format_tb(exc_info[2]))}\n"
+        "===================="
+    )
 
     error = context.error
     try:
         raise error
     except BadRequest as e:
-        # handle malformed requests
         error_message = f"❌ Solicitud incorrecta: {e}"
-        logger.error(error_message)
+        logger.error(f"BadRequest Error:\n"
+                    f"Error: {str(e)}\n"
+                    f"Update: {update}\n"
+                    f"Context: {context}")
         if update and hasattr(update, "effective_message"):
             await update.effective_message.reply_text(
                 "Lo siento, no pude procesar tu solicitud. Por favor, inténtalo de nuevo."
             )
 
     except TimedOut as e:
-        # handle slow connection problems
         error_message = f"⌛ Tiempo de espera agotado: {e}"
-        logger.warning(error_message)
+        logger.warning(f"Timeout Error:\n"
+                      f"Error: {str(e)}\n"
+                      f"Update: {update}\n"
+                      f"Context: {context}")
         if update and hasattr(update, "effective_message"):
             await update.effective_message.reply_text(
                 "El servidor está tardando en responder. Por favor, inténtalo de nuevo en unos momentos."
             )
 
     except NetworkError as e:
-        # handle other connection problems
         error_message = f"🌐 Error de red: {e}"
-        logger.error(error_message)
+        logger.error(f"Network Error:\n"
+                    f"Error: {str(e)}\n"
+                    f"Update: {update}\n"
+                    f"Context: {context}")
         await notify_admins(context, f"Error de red detectado:\n{error_message}")
 
-    except RetryAfter as e:
-        # handle flood control
-        error_message = f"⏳ Flood control: retry after {e.retry_after} seconds"
-        logger.warning(error_message)
-        if update and hasattr(update, "effective_message"):
-            await update.effective_message.reply_text(
-                f"Demasiadas solicitudes. Por favor, espera {e.retry_after} segundos."
-            )
-
-    except TelegramError as e:
-        # handle all other telegram related errors
-        error_message = f"📱 Error de Telegram: {e}"
-        logger.error(error_message)
-        await notify_admins(context, error_message)
-
     except Exception as e:
-        # handle all other errors
-        error_message = f"💥 Error crítico: {e}"
-        logger.critical(error_message, exc_info=True)
-        await notify_admins(context, f"Error crítico detectado:\n{error_message}")
+        # Log detailed error information
+        logger.critical(
+            "\n=== Critical Error ===\n"
+            f"Error Type: {type(e).__name__}\n"
+            f"Error Message: {str(e)}\n"
+            f"Update: {update}\n"
+            f"Chat Data: {context.chat_data}\n"
+            f"User Data: {context.user_data}\n"
+            f"=== Stack Trace ===\n"
+            f"{''.join(traceback.format_tb(exc_info[2]))}\n"
+            "===================="
+        )
 
         if update and hasattr(update, "effective_message"):
             await update.effective_message.reply_text(
-                "Ha ocurrido un error inesperado. Los administradores han sido notificados."
+                "Ha ocurrido un error al procesar tu solicitud. Por favor, inténtalo de nuevo."
             )
 
     finally:
-        # Log additional information if available
+        # Log detailed context information
+        context_info = {
+            "update": update,
+            "error": context.error,
+            "chat_data": context.chat_data,
+            "user_data": context.user_data,
+            "bot_data": context.bot_data
+        }
+
+        logger.info("\n=== Context Information ===")
+        for key, value in context_info.items():
+            logger.info(f"{key}: {value}")
+
+        # Log user information if available
         if update and hasattr(update, "effective_user"):
-            user_info = (
-                f"\nUsuario: {update.effective_user.id}"
-                f"\nNombre: {update.effective_user.first_name}"
+            user = update.effective_user
+            logger.info(
+                "\n=== User Information ===\n"
+                f"User ID: {user.id}\n"
+                f"Username: {user.username}\n"
+                f"First Name: {user.first_name}\n"
+                f"Last Name: {user.last_name}\n"
+                f"Language Code: {user.language_code}"
             )
-            logger.error(user_info)
 
+        # Log chat information if available
         if update and hasattr(update, "effective_chat"):
-            chat_info = (
-                f"\nChat: {update.effective_chat.id}"
-                f"\nTipo: {update.effective_chat.type}"
+            chat = update.effective_chat
+            logger.info(
+                "\n=== Chat Information ===\n"
+                f"Chat ID: {chat.id}\n"
+                f"Chat Type: {chat.type}\n"
+                f"Chat Title: {chat.title}"
             )
-            logger.error(chat_info)
 
+        # Log message information if available
         if update and hasattr(update, "effective_message"):
-            message_info = f"\nMensaje: {update.effective_message.text}"
-            logger.error(message_info)
+            message = update.effective_message
+            logger.info(
+                "\n=== Message Information ===\n"
+                f"Message ID: {message.message_id}\n"
+                f"Date: {message.date}\n"
+                f"Text: {message.text}\n"
+                f"Caption: {message.caption}"
+            )
 
-        # Notify admins about the error
-        await notify_admins(context, f"Error occurred: {str(context.error)}")
+        # Notify admins with detailed error information
+        error_report = (
+            f"Error Type: {type(context.error).__name__}\n"
+            f"Error Message: {str(context.error)}\n"
+            f"Update: {update}"
+        )
+        await notify_admins(context, error_report)

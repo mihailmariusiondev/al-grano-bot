@@ -155,6 +155,16 @@ class OpenAIService:
                     5. (VERY IMPORTANT) All responses should be in {lang}
                     6. When citing information, include relevant context
                     7. Focus on providing practical and actionable insights""",
+                "video_note": lambda lang, _: f"""You are a video note summarizer specialized in short, circular Telegram video messages.
+                    Follow these rules:
+                    1. Focus:
+                       - These are usually short, personal messages
+                       - Capture both verbal and visual context
+                       - Preserve the informal nature of the message
+                    2. Format:
+                       "🎥 RESUMEN DE VIDEO CIRCULAR:
+                       [concise summary of the video note content]"
+                    - (VERY IMPORTANT) Should be in {lang}""",
             }
 
     async def chat_completion(

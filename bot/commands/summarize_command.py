@@ -176,7 +176,7 @@ async def summarize_command(update: Update, context: CallbackContext):
                 await update_progress(wait_message, PROGRESS_MESSAGES["DOWNLOADING"])
                 await update_progress(wait_message, PROGRESS_MESSAGES["PROCESSING"])
                 content = await video_handler(reply_msg, context)
-                summary_type = "telegram_video"
+                summary_type = "video_note" if message_type == "video_note" else "telegram_video"
 
             case "document":
                 await update_progress(wait_message, PROGRESS_MESSAGES["ANALYZING"])
