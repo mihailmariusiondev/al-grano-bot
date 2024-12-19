@@ -10,8 +10,8 @@ logger = logger.get_logger(__name__)
 
 def main():
     try:
-        # Load environment variables
-        load_dotenv()
+        # Load environment variables, overriding existing ones
+        load_dotenv(override=True)
 
         # Load configuration
         config.load_from_env()
