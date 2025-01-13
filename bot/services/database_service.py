@@ -32,6 +32,15 @@ class DatabaseService:
             self.db_path = db_path
             self.conn = await aiosqlite.connect(db_path)
             self.conn.row_factory = aiosqlite.Row
+
+            # Add daily_summary_enabled to telegram_chat_state table if it doesn't exist
+            await self.conn.execute(
+                """
+                ALTER TABLE telegram_chat_state
+                ADD COLUMN daily_summary_enabled BOOLEAN DEFAULT FALSE
+            """
+            )
+
             # Create tables
             await self.conn.execute(
                 """
@@ -127,6 +136,10 @@ class DatabaseService:
             )
             await self.conn.commit()
             self.logger.info("Database initialized successfully")
+        except aiosqlite.OperationalError as e:
+            if "duplicate column" not in str(e).lower():
+                raise
+            self.logger.info("daily_summary_enabled column already exists")
         except Exception as e:
             self.logger.error(f"Failed to initialize database: {e}")
             raise
