@@ -33,13 +33,28 @@ class DatabaseService:
             self.conn = await aiosqlite.connect(db_path)
             self.conn.row_factory = aiosqlite.Row
 
-            # Add daily_summary_enabled to telegram_chat_state table if it doesn't exist
-            await self.conn.execute(
-                """
-                ALTER TABLE telegram_chat_state
-                ADD COLUMN daily_summary_enabled BOOLEAN DEFAULT FALSE
-            """
-            )
+            # Add columns if they don't exist
+            try:
+                await self.conn.execute(
+                    """
+                    ALTER TABLE telegram_chat_state
+                    ADD COLUMN daily_summary_enabled BOOLEAN DEFAULT FALSE
+                    """
+                )
+            except aiosqlite.OperationalError as e:
+                if "duplicate column" not in str(e).lower():
+                    raise
+
+            try:
+                await self.conn.execute(
+                    """
+                    ALTER TABLE telegram_chat_state
+                    ADD COLUMN summary_type TEXT DEFAULT 'long'
+                    """
+                )
+            except aiosqlite.OperationalError as e:
+                if "duplicate column" not in str(e).lower():
+                    raise
 
             # Create tables
             await self.conn.execute(
@@ -73,6 +88,8 @@ class DatabaseService:
                     chat_id INTEGER PRIMARY KEY,
                     is_bot_started BOOLEAN DEFAULT FALSE,
                     last_command_usage TIMESTAMP NULL,
+                    daily_summary_enabled BOOLEAN DEFAULT FALSE,
+                    summary_type TEXT DEFAULT 'long',
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
@@ -136,10 +153,6 @@ class DatabaseService:
             )
             await self.conn.commit()
             self.logger.info("Database initialized successfully")
-        except aiosqlite.OperationalError as e:
-            if "duplicate column" not in str(e).lower():
-                raise
-            self.logger.info("daily_summary_enabled column already exists")
         except Exception as e:
             self.logger.error(f"Failed to initialize database: {e}")
             raise

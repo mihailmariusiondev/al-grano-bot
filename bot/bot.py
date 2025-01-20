@@ -21,6 +21,7 @@ from bot.utils.logger import logger
 from bot.services.database_service import db_service
 from bot.services.scheduler_service import scheduler_service
 from bot.services.message_service import message_service
+from bot.commands.toggle_summary_type_command import toggle_summary_type_command
 import asyncio
 
 
@@ -56,6 +57,9 @@ class TelegramBot:
         self.application.add_handler(CommandHandler("summarize", summarize_command))
         self.application.add_handler(
             CommandHandler("toggle_daily_summary", toggle_daily_summary_command)
+        )
+        self.application.add_handler(
+            CommandHandler("toggle_summary_type", toggle_summary_type_command)
         )
         self.application.add_handler(
             MessageHandler(filters.TEXT & ~filters.COMMAND, message_handler)

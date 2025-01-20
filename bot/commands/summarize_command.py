@@ -51,6 +51,7 @@ PROGRESS_MESSAGES = {
 
 logger = logger.get_logger(__name__)
 
+
 async def update_progress(message, text: str, delay: float = 0.5) -> None:
     """Update progress message with new status"""
     try:
@@ -58,6 +59,7 @@ async def update_progress(message, text: str, delay: float = 0.5) -> None:
         await message.edit_text(f"{text}")
     except Exception as e:
         logger.error(f"Error updating progress: {e}")
+
 
 @admin_command()
 @premium_only()
@@ -93,8 +95,20 @@ async def summarize_command(update: Update, context: CallbackContext):
             await update_progress(wait_message, PROGRESS_MESSAGES["FORMATTING"])
             formatted_messages = format_recent_messages(recent_messages)
 
+            # Get chat state to determine summary type
+            chat_state = await db_service.get_chat_state(update.effective_chat.id)
+            summary_type = (
+                "chat_long"
+                if chat_state.get("summary_type", "long") == "long"
+                else "chat_short"
+            )
+
             await update_progress(wait_message, PROGRESS_MESSAGES["SUMMARIZING"])
-            summary = await openai_service.get_summary(formatted_messages, "chat")
+            summary = await openai_service.get_summary(
+                content=formatted_messages,
+                summary_type=summary_type,
+                language="Spanish",
+            )
 
             await update_progress(wait_message, PROGRESS_MESSAGES["FINALIZING"])
             await send_long_message(update, summary)

@@ -1,12 +1,13 @@
 from telegram import Update
 from telegram.ext import ContextTypes
-from bot.utils.decorators import log_command, bot_started
+from bot.utils.decorators import log_command, bot_started, admin_command
 from bot.utils.logger import logger
 from bot.services.database_service import db_service
 
 logger = logger.get_logger(__name__)
 
 
+@admin_command()
 @log_command()
 @bot_started()
 async def toggle_daily_summary_command(
