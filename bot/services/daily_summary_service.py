@@ -66,8 +66,18 @@ async def generate_daily_summary(chat_id: int) -> str:
         # Format messages for summary
         formatted_messages = format_recent_messages(messages)
 
+        # Get chat state to determine summary type
+        chat_state = await db_service.get_chat_state(chat_id)
+        summary_type = (
+            "chat_long"
+            if chat_state.get("summary_type", "long") == "long"
+            else "chat_short"
+        )
+
         # Generate summary
-        summary = await openai_service.get_summary(formatted_messages, "chat")
+        summary = await openai_service.get_summary(
+            content=formatted_messages, summary_type=summary_type, language="Spanish"
+        )
 
         # Add header to summary
         madrid_tz = pytz.timezone("Europe/Madrid")
