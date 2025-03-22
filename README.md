@@ -1,80 +1,60 @@
-# Al-Grano Telegram Bot
+# Al-Grano Telegram Summarization Bot
 
-Al-Grano is a Telegram bot designed to summarize various types of content for chat groups. It can generate concise summaries of conversations, YouTube videos, articles, documents, and more.
+Al-Grano is a powerful Telegram bot that helps users summarize various types of content, from chat conversations to videos, documents, and web articles. The bot leverages OpenAI's advanced language models to generate concise, informative summaries.
 
 ## Features
 
-- **Chat Summarization**: Summarize recent conversations with `/summarize` command
-- **Content Summarization**: Summarize various media types:
+- **Text Summarization**: Summarize recent chat messages or specific text messages
+- **Media Summarization**:
 
-  - Text messages
-  - YouTube videos (via subtitles)
-  - Web articles
-  - Documents (PDF, DOCX, TXT)
-  - Audio and voice messages
+  - YouTube videos (using transcript extraction)
+  - Voice messages and audio files
   - Videos and video notes
-  - Photos and polls
+  - Documents (PDF, DOCX, TXT)
+  - Photos (with image analysis)
+  - Web articles
+  - Polls
 
-- **Daily Summary**: Automatically generate daily summaries of chat activity
-- **Customizable Summaries**: Toggle between detailed and concise summary formats
-- **Premium Features**: Enhanced functionality for premium users
-- **Admin Controls**: Special commands for chat administrators
+- **Daily Summaries**: Automatic daily summaries of chat activity
+- **Flexible Summary Types**: Toggle between detailed or concise summary formats
+- **User Management**: Premium and admin user management
+- **Cooldown System**: Prevent command spam with a configurable cooldown
 
-## Commands
+## Installation
 
-- `/start` - Initialize the bot in the chat
-- `/help` - Display a detailed help guide
-- `/summarize` - Generate summaries of messages or specific content
-- `/toggle_daily_summary` - Enable/disable automatic daily chat summaries
-- `/toggle_summary_type` - Switch between detailed and concise summary formats
+1. Clone the repository:
 
-## How to Use
+```bash
+git clone https://github.com/yourusername/al-grano-bot.git
+cd al-grano-bot
+```
 
-### Summarizing Recent Messages
+2. Create and activate the conda environment:
 
-Send `/summarize` without replying to any message to summarize the last 300 messages in the chat.
+```bash
+conda env create -f environment.yml
+conda activate al-grano-bot
+```
 
-### Summarizing Specific Content
+3. Create a `.env` file with your configuration:
 
-Reply to a message with `/summarize` to generate a summary of that specific content, whether it's text, media, or a link.
+```
+BOT_TOKEN=your_telegram_bot_token
+OPENAI_API_KEY=your_openai_api_key
+DB_PATH=bot.db
+LOG_LEVEL=INFO
+DEBUG_MODE=false
+```
 
-### YouTube Video Summarization
+4. Run the bot:
 
-Reply to a message containing a YouTube link with `/summarize` to get a summary based on the video's subtitles.
-
-## Installation and Setup
-
-1. **Clone the repository**
-
-   ```
-   git clone https://github.com/yourusername/al-grano-bot.git
-   cd al-grano-bot
-   ```
-
-2. **Set up the environment**
-
-   ```
-   conda env create -f environment.yml
-   conda activate al-grano-bot
-   ```
-
-3. **Set up environment variables**
-   Create a `.env` file with the following variables:
-
-   ```
-   BOT_TOKEN=your_telegram_bot_token
-   OPENAI_API_KEY=your_openai_api_key
-   DB_PATH=bot.db
-   LOG_LEVEL=INFO
-   DEBUG_MODE=false
-   ```
-
-4. **Run the bot**
-   ```
-   python main.py
-   ```
+```bash
+python main.py
+```
 
 ## Dependencies
+
+The bot requires:
 
 - Python 3.12
 - python-telegram-bot
@@ -86,15 +66,39 @@ Reply to a message containing a YouTube link with `/summarize` to get a summary 
 - PyPDF2
 - pytz
 - APScheduler
+- ffmpeg (for audio/video processing)
 
-## Architecture
+## Commands
 
-The bot uses a modular design:
+- `/start` - Initialize the bot in the chat
+- `/help` - Display the help message with all available commands
+- `/summarize` - Generate a summary (can be used as a reply to specific content)
+- `/toggle_daily_summary` - Enable or disable automatic daily summaries
+- `/toggle_summary_type` - Switch between detailed and concise summary formats
 
-- Command handlers process user commands
-- Media handlers process different content types
-- Services manage state, scheduling, and AI integration
-- Utilities provide helper functions
+## How to Use
+
+### Summarizing Chat History
+
+Simply send `/summarize` without replying to any message, and the bot will summarize the last 300 messages in the chat.
+
+### Summarizing Specific Content
+
+Reply to any supported content with `/summarize`, and the bot will analyze and summarize that specific content.
+
+### Daily Summaries
+
+Enable daily summaries with `/toggle_daily_summary`. The bot will automatically generate a summary of the previous day's chat activity at 3 AM (Madrid time).
+
+## Project Structure
+
+- `bot/`: Main application code
+  - `bot.py`: Bot initialization and configuration
+  - `commands/`: Command handlers
+  - `handlers/`: Content type handlers
+  - `services/`: Core services (OpenAI, database, scheduling)
+  - `utils/`: Utility functions and helpers
+- `main.py`: Application entry point
 
 ## Contributing
 
@@ -104,6 +108,7 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 This project is licensed under the MIT License - see the LICENSE file for details.
 
-## Support
+## Acknowledgments
 
-If you find this bot useful, consider supporting its development.
+- Thanks to the OpenAI team for providing the API
+- Thanks to the python-telegram-bot developers
