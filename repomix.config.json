@@ -1,6 +1,6 @@
 {
   "output": {
-    "filePath": "repopack-output.xml",
+    "filePath": "repomix-output.xml",
     "style": "xml",
     "removeComments": false,
     "removeEmptyLines": true,
@@ -13,7 +13,7 @@
     "useDefaultPatterns": true,
     "customPatterns": [
       ".gitignore",
-      "repopack.config.json",
+      "repomix.config.json",
       ".cursorrules",
       "prompts",
       "README.md",

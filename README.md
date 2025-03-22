@@ -1,184 +1,109 @@
-# Telegram Bot Template in Python
+# Al-Grano Telegram Bot
 
-This is a template for creating a Telegram bot using Python. It is designed to be easily extensible and customizable for various purposes.
+Al-Grano is a Telegram bot designed to summarize various types of content for chat groups. It can generate concise summaries of conversations, YouTube videos, articles, documents, and more.
 
 ## Features
 
-- Basic command handling (/start, /help, /about)
-- Text message handling
-- Detailed error logging
-- Integration with OpenAI API for audio transcription and text generation
-- Logging configuration for monitoring and debugging
+- **Chat Summarization**: Summarize recent conversations with `/summarize` command
+- **Content Summarization**: Summarize various media types:
 
-## Requirements
+  - Text messages
+  - YouTube videos (via subtitles)
+  - Web articles
+  - Documents (PDF, DOCX, TXT)
+  - Audio and voice messages
+  - Videos and video notes
+  - Photos and polls
 
-- Python 3.12
-- Telegram account
-- Telegram bot token
-- OpenAI API key
+- **Daily Summary**: Automatically generate daily summaries of chat activity
+- **Customizable Summaries**: Toggle between detailed and concise summary formats
+- **Premium Features**: Enhanced functionality for premium users
+- **Admin Controls**: Special commands for chat administrators
 
-## Initial Setup
+## Commands
 
-To customize this template for your own Telegram bot, follow these steps:
+- `/start` - Initialize the bot in the chat
+- `/help` - Display a detailed help guide
+- `/summarize` - Generate summaries of messages or specific content
+- `/toggle_daily_summary` - Enable/disable automatic daily chat summaries
+- `/toggle_summary_type` - Switch between detailed and concise summary formats
 
-1. **Obtain Credentials**:
+## How to Use
 
-   - **Telegram Bot Token**: Create a bot using BotFather and get the token.
-   - **OpenAI API Key**: Sign up at OpenAI and generate an API key.
+### Summarizing Recent Messages
 
-2. **Set Environment Variables**:
+Send `/summarize` without replying to any message to summarize the last 300 messages in the chat.
 
-   - Create a `.env` file in the project root with the following:
-     ```plaintext
-     BOT_TOKEN=your_telegram_bot_token
-     OPENAI_API_KEY=your_openai_api_key
-     ```
+### Summarizing Specific Content
 
-3. **Modify Handlers**:
+Reply to a message with `/summarize` to generate a summary of that specific content, whether it's text, media, or a link.
 
-   - Customize messages and logic in the handler files (`bot/handlers/`) to fit your desired functionalities.
+### YouTube Video Summarization
 
-4. **Configure Logging**:
+Reply to a message containing a YouTube link with `/summarize` to get a summary based on the video's subtitles.
 
-   - Adjust logging settings in `bot/utils/logging_config.py` as needed.
+## Installation and Setup
 
-5. **Update Dependencies**:
+1. **Clone the repository**
 
-   - Add any additional libraries to `environment.yml` and update the environment with:
-     ```bash
-     conda env update --file environment.yml
-     ```
-
-6. **Change Environment Name**:
-
-   - In `environment.yml`, change the environment name to something specific for your project:
-     ```yaml
-     name: your-environment-name
-     ```
-
-7. **Review Configurations**:
-   - Ensure any additional settings in `config/constants.py` (if present) are adjusted to your needs.
-
-## Installation
-
-1. Clone this repository:
-
-   ```bash
-   git clone https://github.com/your-username/repo-name.git
-   cd repo-name
+   ```
+   git clone https://github.com/yourusername/al-grano-bot.git
+   cd al-grano-bot
    ```
 
-2. Create a virtual environment with Conda:
-   ```bash
+2. **Set up the environment**
+
+   ```
    conda env create -f environment.yml
-   conda activate your-environment-name
+   conda activate al-grano-bot
    ```
 
-## Usage
+3. **Set up environment variables**
+   Create a `.env` file with the following variables:
 
-To start the bot, follow these steps:
-
-1. Ensure you are in the project directory.
-
-2. Activate the virtual environment if not already active:
-
-   ```bash
-   conda activate your-environment-name
+   ```
+   BOT_TOKEN=your_telegram_bot_token
+   OPENAI_API_KEY=your_openai_api_key
+   DB_PATH=bot.db
+   LOG_LEVEL=INFO
+   DEBUG_MODE=false
    ```
 
-3. Run the main script:
-
-   ```bash
+4. **Run the bot**
+   ```
    python main.py
    ```
 
-4. The bot should now be running. Interact with it on Telegram using commands `/start`, `/help`, and `/about`.
+## Dependencies
 
-5. To stop the bot, press Ctrl+C in the terminal.
+- Python 3.12
+- python-telegram-bot
+- openai
+- aiosqlite
+- youtube-transcript-api
+- python-readability
+- python-docx
+- PyPDF2
+- pytz
+- APScheduler
 
-## Project Structure
+## Architecture
 
-- `bot/`: Contains the main bot logic
-  - `handlers/`: Command and message handlers
-  - `services/`: Services for transcription and OpenAI
-  - `utils/`: Utilities for configuration and logging
-- `main.py`: Application entry point
+The bot uses a modular design:
 
-## Starting a New Project
-
-To start a new project with this template, follow these steps:
-
-1. **Clone the Repository**:
-
-   - Clone the template repository to your local machine.
-
-   ```bash
-   git clone https://github.com/your-username/telegram-bot-template.git
-   cd telegram-bot-template
-   ```
-
-2. **Rename the Project**:
-
-   - Optionally, rename the directory to reflect your new project's name.
-
-   ```bash
-   mv telegram-bot-template your-new-project
-   cd your-new-project
-   ```
-
-3. **Configure the Environment**:
-
-   - Follow the initial setup instructions to customize the bot.
-
-4. **Version Control**:
-
-   - Initialize a new Git repository if you want to track changes.
-
-   ```bash
-   git init
-   git add .
-   git commit -m "Initial commit"
-   ```
-
-5. **Deploy**:
-   - Once satisfied with local testing, consider deploying your bot to a server or cloud service for continuous operation.
+- Command handlers process user commands
+- Media handlers process different content types
+- Services manage state, scheduling, and AI integration
+- Utilities provide helper functions
 
 ## Contributing
 
-Contributions are welcome. Please open an issue to discuss major changes before submitting a pull request.
+Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## License
 
-[MIT](https://choosealicense.com/licenses/mit/)
+This project is licensed under the MIT License - see the LICENSE file for details.
 
-## TODO
+## Support
 
-# FIX
-
-6. Potential Oversized Input to OpenAI API
-
-Issue:
-When summarizing recent messages, the combined text might exceed the token limit of the OpenAI API model, causing errors or increased costs.
-
-Issue 2:
-Is it a good idea to let users config all of these?
-
-# IDEAS
-
-Estoy pensando en la siguiente estrategia para resumir los últimos mensajes:
-
-- Para empezar, no sé cuál sería la manera ideal de resumir una conversación de telegram. ¿Resumir todos los mensajes? (esto seguro que es inviable) ¿Resumir los últimos 300 mensajes? ¿Por qué los últimos 300 y no los 100 o los 500? ¿Por qué no los últimos N mensajes? ¿Qué hacemos con mensajes anteriores? ¿Los olvidamos? ¿Qué hacemos con mensajes ya resumidos? ¿Los incluimos en el resumen?
-- Supongamos que resumimos los últimos 300 mensajes.
-- Por defecto, se arrastran también los mensajes de voz (no audio, ojo) y los video_note para resumir, porque digamos que suelen formar parte de una conversación (quizá esto no sea buena idea y solo se hagan el resumen de texto)
-- Los mensajes de voz y video_note se transcriben a texto primero
-- El límite de caracteres para un mensaje es de 4096 caracteres.
-- El modelo gpt-4o-mini puede resumir 128k tokens, es decir, unos 31250 caracteres.
-- Podriamos coger tanta cantidad de mensajes como hagan falta para llegar a esos 31250 caracteres (hay que tener en cuenta que los mensajes de voz y video_note se transcriben a texto primero, así que habrá que ver cuántos caracteres suponen).
-- Una vez llegados a los 31250 caracteres, se hace un resumen usando gpt-4o-mini.
-- Lo que no sé es cómo pasarle el modelo el mejor contexto posible para que haga un resumen coherente, hay que tener en cuenta que los usuarios pueden responder a un mensaje con otro mensaje, al igual que se puede responder a un mensaje con un mensaje de voz o video_note, supongo que habrá que darle un prompt para que haga un resumen coherente. ¿Cómo podría pasarle el contexto de la mejor manera posible para que el modelo entienda que tiene que hacer un resumen coherente?
-- Ejemplo de contexto: "El usuario X dijo blablabla, el usuario Y respondió blablabla, después el usuario X dijo blablabla y el usuario Y respondió blablabla". ¿Sería esto suficiente para que el modelo haga un resumen coherente? ¿Qué otras estrategias podría usar?
-- De momento estamos lidiando con un solo resumen (chunk), habrá que ver cómo conseguir no perder contexto si se hace un resumen de N chunks (porque esos ya estarán resumidos).
-- Se le pasa el resumen del chunk anterior como contexto para que tenga en cuenta lo que ya se ha resumido.
-- ¿Qué hacemos si hay muy pocos mensajes? ¿Cómo se hace el resumen o qué estrategia usamos?
-- ¿Estoy pasando algo por alto? ¿Hay alguna otra estrategia que no se me ocurre?
-- ¿Lo estoy complicando demasiado?
+If you find this bot useful, consider supporting its development.
