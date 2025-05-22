@@ -66,11 +66,50 @@ class DatabaseService:
                     last_name TEXT,
                     is_premium BOOLEAN DEFAULT FALSE,
                     is_admin BOOLEAN DEFAULT FALSE,
+                    last_text_summary_time TIMESTAMP NULL,
+                    last_media_summary_time TIMESTAMP NULL,
+                    media_summary_daily_count INTEGER DEFAULT 0,
+                    media_summary_last_reset TIMESTAMP NULL,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """
             )
+
+            # Add new columns to telegram_user if they don't exist
+            try:
+                await self.conn.execute(
+                    "ALTER TABLE telegram_user ADD COLUMN last_text_summary_time TIMESTAMP NULL"
+                )
+                await self.conn.commit()
+            except aiosqlite.OperationalError as e:
+                if "duplicate column" not in str(e).lower():
+                    raise
+            try:
+                await self.conn.execute(
+                    "ALTER TABLE telegram_user ADD COLUMN last_media_summary_time TIMESTAMP NULL"
+                )
+                await self.conn.commit()
+            except aiosqlite.OperationalError as e:
+                if "duplicate column" not in str(e).lower():
+                    raise
+            try:
+                await self.conn.execute(
+                    "ALTER TABLE telegram_user ADD COLUMN media_summary_daily_count INTEGER DEFAULT 0"
+                )
+                await self.conn.commit()
+            except aiosqlite.OperationalError as e:
+                if "duplicate column" not in str(e).lower():
+                    raise
+            try:
+                await self.conn.execute(
+                    "ALTER TABLE telegram_user ADD COLUMN media_summary_last_reset TIMESTAMP NULL"
+                )
+                await self.conn.commit()
+            except aiosqlite.OperationalError as e:
+                if "duplicate column" not in str(e).lower():
+                    raise
+
             # Crear trigger para actualizar 'updated_at' automáticamente en telegram_user
             await self.conn.execute(
                 """
@@ -324,8 +363,10 @@ class DatabaseService:
                 # Crear nuevo usuario
                 insert_query = """
                     INSERT INTO telegram_user (
-                        user_id, username, first_name, last_name
-                    ) VALUES (?, ?, ?, ?)
+                        user_id, username, first_name, last_name,
+                        last_text_summary_time, last_media_summary_time,
+                        media_summary_daily_count, media_summary_last_reset
+                    ) VALUES (?, ?, ?, ?, NULL, NULL, 0, CURRENT_TIMESTAMP)
                 """
                 await self.execute(
                     insert_query, (user_id, username, first_name, last_name)
@@ -410,6 +451,48 @@ class DatabaseService:
         except Exception as e:
             self.logger.error(f"Error fetching admin users: {e}")
             return []
+
+    async def update_user_summary_rate_limit_data(
+        self,
+        user_id: int,
+        last_text_summary_time: Optional[str] = None,
+        last_media_summary_time: Optional[str] = None,
+        media_summary_daily_count: Optional[int] = None,
+        media_summary_last_reset: Optional[str] = None,
+    ):
+        if not self.conn:
+            raise RuntimeError("Database not initialized")
+
+        fields_to_update = []
+        params = []
+
+        if last_text_summary_time is not None:
+            fields_to_update.append("last_text_summary_time = ?")
+            params.append(last_text_summary_time)
+        if last_media_summary_time is not None:
+            fields_to_update.append("last_media_summary_time = ?")
+            params.append(last_media_summary_time)
+        if media_summary_daily_count is not None:
+            fields_to_update.append("media_summary_daily_count = ?")
+            params.append(media_summary_daily_count)
+        if media_summary_last_reset is not None:
+            fields_to_update.append("media_summary_last_reset = ?")
+            params.append(media_summary_last_reset)
+
+        if not fields_to_update:
+            self.logger.info(f"No fields to update for user {user_id} in update_user_summary_rate_limit_data")
+            return
+
+        query = f"UPDATE telegram_user SET {', '.join(fields_to_update)}, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?"
+        params.append(user_id)
+
+        try:
+            await self.execute(query, tuple(params))
+            self.logger.info(f"Successfully updated rate limit data for user {user_id}. Fields: {fields_to_update}")
+        except Exception as e:
+            self.logger.error(f"Error updating rate limit data for user {user_id}: {e}")
+            # Potentially re-raise or handle as appropriate
+            raise
 
 
 db_service = DatabaseService()  # Single instance
