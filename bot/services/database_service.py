@@ -33,29 +33,6 @@ class DatabaseService:
             self.conn = await aiosqlite.connect(db_path)
             self.conn.row_factory = aiosqlite.Row
 
-            # Add columns if they don't exist
-            try:
-                await self.conn.execute(
-                    """
-                    ALTER TABLE telegram_chat_state
-                    ADD COLUMN daily_summary_enabled BOOLEAN DEFAULT FALSE
-                    """
-                )
-            except aiosqlite.OperationalError as e:
-                if "duplicate column" not in str(e).lower():
-                    raise
-
-            try:
-                await self.conn.execute(
-                    """
-                    ALTER TABLE telegram_chat_state
-                    ADD COLUMN summary_type TEXT DEFAULT 'long'
-                    """
-                )
-            except aiosqlite.OperationalError as e:
-                if "duplicate column" not in str(e).lower():
-                    raise
-
             # Create tables
             await self.conn.execute(
                 """
@@ -64,7 +41,6 @@ class DatabaseService:
                     username TEXT,
                     first_name TEXT,
                     last_name TEXT,
-                    is_premium BOOLEAN DEFAULT FALSE,
                     is_admin BOOLEAN DEFAULT FALSE,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -151,6 +127,33 @@ class DatabaseService:
                 END;
                 """
             )
+
+            # Add columns if they don't exist
+            try:
+                await self.conn.execute(
+                    """
+                    ALTER TABLE telegram_chat_state
+                    ADD COLUMN daily_summary_enabled BOOLEAN DEFAULT FALSE
+                    """
+                )
+            except aiosqlite.OperationalError as e:
+                if "duplicate column" not in str(e).lower():
+                    # Log or ignore if the table might not exist yet,
+                    # but for now, we'll re-raise if it's not a duplicate column error
+                    pass # Or self.logger.warning("Could not add daily_summary_enabled, table might not exist or other issue.")
+
+            try:
+                await self.conn.execute(
+                    """
+                    ALTER TABLE telegram_chat_state
+                    ADD COLUMN summary_type TEXT DEFAULT 'long'
+                    """
+                )
+            except aiosqlite.OperationalError as e:
+                if "duplicate column" not in str(e).lower():
+                    # Similar handling as above
+                    pass # Or self.logger.warning("Could not add summary_type, table might not exist or other issue.")
+
             await self.conn.commit()
             self.logger.info("Database initialized successfully")
         except Exception as e:
@@ -200,17 +203,6 @@ class DatabaseService:
             await self.conn.close()
             self.logger.info("Database connection closed")
             self.conn = None
-
-    async def is_premium_user(self, user_id: int) -> bool:
-        """Check if a user has premium status"""
-        try:
-            user = await self.fetch_one(
-                "SELECT is_premium FROM telegram_user WHERE user_id = ?", (user_id,)
-            )
-            return user["is_premium"] if user else False
-        except Exception as e:
-            self.logger.error(f"Error checking premium status for user {user_id}: {e}")
-            return False
 
     async def get_recent_messages(self, chat_id: int, limit: int = 300) -> List[Dict]:
         """Get recent messages from a chat"""

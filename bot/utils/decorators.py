@@ -106,28 +106,6 @@ def cooldown(seconds: int):
     return decorator
 
 
-def premium_only():
-    """
-    Decorator to restrict command access to premium users only
-    """
-
-    def decorator(func):
-        @wraps(func)
-        async def wrapped(update: Update, context: ContextTypes.DEFAULT_TYPE):
-            user_id = update.effective_user.id
-            is_premium = await db_service.is_premium_user(user_id)
-            if not is_premium:
-                await update.message.reply_text(
-                    "Este comando es solo para usuarios premium!"
-                )
-                return
-            return await func(update, context)
-
-        return wrapped
-
-    return decorator
-
-
 def log_command():
     """
     Decorator to log command usage with extended user information

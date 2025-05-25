@@ -40,7 +40,7 @@ Basado en el análisis del código proporcionado, las siguientes funcionalidades
   - El tipo de resumen se almacena en `telegram_chat_state` y se usa tanto para `/summarize` (chat reciente) como para resúmenes diarios.
 - **Manejo de Usuarios y Permisos**:
   - Creación y actualización de usuarios en la BD (`get_or_create_user`).
-  - Decoradores `@admin_command` y `@premium_only` para restringir el acceso a comandos.
+  - Decorador `@admin_command` para restringir el acceso a comandos.
   - Los administradores pueden ser definidos en la BD (campo `is_admin`).
 - **Utilidades y Soporte**:
   - Sistema de logging robusto (`Logger`).
@@ -50,13 +50,10 @@ Basado en el análisis del código proporcionado, las siguientes funcionalidades
 
 ## 2. Qué Queda por Construir (o Mejorar)
 
-- **Gestión de Usuarios Premium Completa**:
-  - Actualmente, `@premium_only` restringe el acceso, pero no hay una lógica visible sobre cómo un usuario se _convierte_ en premium (ej. sistema de pago, comando de admin para otorgarlo).
-  - Las "funcionalidades avanzadas como resúmenes más detallados y mayor capacidad de procesamiento" mencionadas en el mensaje de `/help` para premium no están explícitamente implementadas de forma diferenciada más allá del acceso. El tipo de resumen (largo/corto) es global por chat, no por usuario.
 - **Comando `/about`**: Mencionado en `/help` pero no hay un handler implementado para él en el código proporcionado.
 - **Traducción y Localización**: Los prompts de OpenAI están codificados en español. Si se deseara soportar múltiples idiomas, se necesitaría un sistema de internacionalización (i18n).
 - **Pruebas Unitarias y de Integración**: No hay archivos de prueba visibles en el código, lo cual es crucial para la mantenibilidad.
-- **Interfaz de Administración Más Completa**: Más allá de los comandos individuales, podría haber una interfaz (ej. web o más comandos de bot) para gestionar usuarios (admins, premium), ver estadísticas, etc.
+- **Interfaz de Administración Más Completa**: Más allá de los comandos individuales, podría haber una interfaz (ej. web o más comandos de bot) para gestionar usuarios (admins), ver estadísticas, etc.
 - **Optimización de Costos de OpenAI**: Aunque se usa GPT-4o-mini para chunks de documentos grandes, un análisis continuo de costos y estrategias de prompting podría ser beneficioso.
 - **Manejo de Límites de Frecuencia de Telegram más Sofisticado**: El cooldown es por comando; Telegram tiene límites más complejos a nivel de bot.
 - **Escalabilidad de la Base de Datos**: SQLite es adecuado para muchos casos, pero para un uso muy intensivo o distribuido, se podría considerar una solución de BD diferente (ej. PostgreSQL).
