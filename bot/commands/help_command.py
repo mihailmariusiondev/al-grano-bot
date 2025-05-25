@@ -36,7 +36,6 @@ HELP_MESSAGE = (
     "• **Encuestas:** Resumen de preguntas y opciones de encuestas enviadas en el chat.\n\n"
     "🔹 **Características Adicionales:**\n"
     "• **Almacenamiento de Mensajes:** Todos los mensajes enviados en el chat se almacenan en la base de datos para facilitar la generación de resúmenes precisos.\n"
-    "• **Usuarios Premium:** Acceso exclusivo a funcionalidades avanzadas como resúmenes más detallados y mayor capacidad de procesamiento.\n"
     "• **Administradores:** Comandos especiales y permisos adicionales para usuarios administradores.\n\n"
     "🔹 **Notas Importantes:**\n"
     "• **Seguridad y Privacidad:** El bot maneja información sensible. Asegúrate de que solo usuarios autorizados tengan acceso a comandos privilegiados.\n"

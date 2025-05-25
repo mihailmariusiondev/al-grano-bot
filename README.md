@@ -26,7 +26,6 @@
   - Comandos intuitivos y mensajes de progreso para una mejor experiencia de usuario.
   - Mensajes de ayuda detallados.
 - **Gestión de Usuarios**:
-  - Distinción entre usuarios normales, premium y administradores con permisos específicos.
 - **Persistencia de Datos**:
   - Almacena mensajes y configuraciones en una base de datos SQLite para un funcionamiento eficiente.
 

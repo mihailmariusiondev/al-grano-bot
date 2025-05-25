@@ -29,7 +29,7 @@ Dado que esta es la primera interacción con el proyecto "Al-Grano Bot" y mi mem
 
 - **Modularidad**: El código está organizado en carpetas (commands, handlers, services, utils), lo que sugiere una preferencia por la separación de responsabilidades.
 - **Singletons para Servicios**: Servicios como `DatabaseService`, `OpenAIService`, `TelegramBot`, `Config`, `Logger`, `MessageService`, `SchedulerService` se implementan como singletons, asegurando una única instancia.
-- **Decoradores**: Uso extensivo de decoradores para funcionalidades transversales como logging (`@log_command`), control de acceso (`@admin_command`, `@premium_only`), verificación de estado (`@bot_started`), y gestión de cooldowns (`@cooldown`).
+- **Decoradores**: Uso extensivo de decoradores para funcionalidades transversales como logging (`@log_command`), control de acceso (`@admin_command`), verificación de estado (`@bot_started`), y gestión de cooldowns (`@cooldown`).
 - **Manejo Asíncrono**: El bot utiliza `asyncio` y `async/await` para operaciones de E/S y concurrencia, crucial para un bot de Telegram.
 - **Configuración Externalizada**: Uso de variables de entorno (`.env` file, gestionado por `python-dotenv` y la clase `Config`) para configuraciones sensibles y específicas del entorno.
 - **Logging Detallado**: Implementación de un servicio de logging robusto que registra información en consola y archivos, con diferentes niveles de severidad.
@@ -44,4 +44,3 @@ Dado que esta es la primera interacción con el proyecto "Al-Grano Bot" y mi mem
 - La gestión de la API de OpenAI (resúmenes, transcripciones, análisis de imágenes) es central para el bot.
 - La persistencia de mensajes es clave para los resúmenes de chat y los resúmenes diarios.
 - El sistema de resúmenes diarios depende de un programador de tareas (`APScheduler`).
-- La funcionalidad de "usuarios premium" está presente a nivel de decorador, pero la lógica de negocio para definir o gestionar qué hace a un usuario "premium" (más allá del flag en la BD) no está completamente detallada en el código provisto.

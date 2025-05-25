@@ -18,7 +18,6 @@
   - Resumir encuestas.
 - **Resúmenes Diarios Automáticos**: Ofrecer la opción de recibir un resumen diario automático de la actividad del chat.
 - **Personalización de Resúmenes**: Permitir a los usuarios elegir entre formatos de resumen largos (detallados) y cortos (concisos).
-- **Gestión de Usuarios**: Distinguir entre usuarios normales, usuarios premium y administradores, con diferentes niveles de acceso a funcionalidades.
 - **Interfaz Intuitiva**: Proporcionar una experiencia de usuario clara y fácil de usar a través de comandos de Telegram.
 - **Persistencia de Datos**: Almacenar mensajes y estados de chat para facilitar la generación de resúmenes y la configuración del bot.
 
@@ -36,7 +35,7 @@
   - Librerías para procesar archivos (PDF, DOCX), extraer contenido de artículos web y transcripciones de YouTube.
 - **Administración**:
   - Comandos restringidos a administradores.
-  - Posibilidad de definir usuarios premium con acceso a funcionalidades mejoradas (aunque la lógica específica de "premium" está presente en decoradores, su implementación completa más allá del acceso no está detallada en el código).
+  - Comandos y funcionalidades específicas restringidas a administradores.
 - **Persistencia**:
   - Base de datos SQLite para almacenar usuarios, mensajes, y estados de chat.
 

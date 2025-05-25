@@ -5,7 +5,6 @@ from bot.utils.decorators import (
     log_command,
     bot_started,
     cooldown,
-    premium_only,
 )
 from bot.utils.format_utils import format_recent_messages, send_long_message
 from bot.utils.logger import logger
@@ -62,7 +61,6 @@ async def update_progress(message, text: str, delay: float = 0.5) -> None:
 
 
 @admin_command()
-@premium_only()
 @log_command()
 @bot_started()
 @cooldown(60)

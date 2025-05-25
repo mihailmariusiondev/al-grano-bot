@@ -35,7 +35,7 @@ El "Al-Grano Bot" sigue una arquitectura modular común en aplicaciones de bots,
 
 - **Singleton**: Varios servicios (`DatabaseService`, `OpenAIService`, `TelegramBot`, `Config`, `Logger`, `MessageService`, `SchedulerService`) se implementan utilizando el patrón Singleton. Esto asegura que solo exista una instancia de estos servicios en toda la aplicación.
 - **Command**: La estructura de `python-telegram-bot` con `CommandHandler` y `MessageHandler` sigue inherentemente el patrón Command, donde cada comando o tipo de mensaje se encapsula como un objeto (el handler) que conoce cómo ejecutar la acción asociada.
-- **Decorator**: Utilizado بكثرة (`@log_command`, `@admin_command`, `@premium_only`, `@bot_started`, `@cooldown`) para añadir funcionalidades transversales a las funciones de comando de manera declarativa y no intrusiva.
+- **Decorator**: Utilizado بكثرة (`@log_command`, `@admin_command`, `@bot_started`, `@cooldown`) para añadir funcionalidades transversales a las funciones de comando de manera declarativa y no intrusiva.
 - **Strategy (Implícito)**:
   - En `summarize_command.py`, la lógica para manejar diferentes tipos de mensajes (`message_type` con `match/case`) puede verse como una forma de Strategy, donde se elige un algoritmo (handler específico) diferente según el tipo de mensaje.
   - En `OpenAIService`, los `SUMMARY_PROMPTS` actúan como estrategias diferentes para generar resúmenes según el `summary_type`.
