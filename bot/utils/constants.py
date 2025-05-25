@@ -39,3 +39,16 @@ SUPPORTED_DOCUMENT_TYPES: List[str] = [
     "application/msword",
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
 ]
+
+# Cooldowns and Limits for /summarize
+COOLDOWN_TEXT_SIMPLE_SECONDS = 120  # 2 minutes
+COOLDOWN_ADVANCED_SECONDS = 600    # 10 minutes
+DAILY_LIMIT_ADVANCED_OPS = 5
+
+# Operation Types
+OPERATION_TYPE_TEXT_SIMPLE = "text_simple"
+OPERATION_TYPE_ADVANCED = "advanced"
+
+# Message Strings for Limits
+MSG_DAILY_LIMIT_REACHED = "Has alcanzado el límite diario de {limit} operaciones avanzadas. Inténtalo de nuevo mañana, figura."
+MSG_COOLDOWN_ACTIVE = "Machooo, espérate un poco antes de volver a usar el comando ({remaining}s)."

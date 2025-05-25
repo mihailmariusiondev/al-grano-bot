@@ -1,4 +1,3 @@
-import asyncio
 import pytz
 from datetime import datetime, timedelta
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -7,7 +6,6 @@ from bot.services.daily_summary_service import send_daily_summaries
 from bot.utils.logger import logger
 
 logger = logger.get_logger(__name__)
-
 
 class SchedulerService:
     _instance = None
@@ -27,7 +25,6 @@ class SchedulerService:
         """Start the scheduler"""
         try:
             if not self.scheduler.running:
-                # Schedule daily summaries at 3 AM Madrid time
                 self.scheduler.add_job(
                     send_daily_summaries,
                     CronTrigger(
@@ -37,7 +34,6 @@ class SchedulerService:
                     name="Generate daily chat summaries",
                     replace_existing=True,
                 )
-
                 self.scheduler.start()
                 logger.info("Scheduler started successfully")
         except Exception as e:
@@ -48,11 +44,11 @@ class SchedulerService:
         """Stop the scheduler"""
         try:
             if self.scheduler.running:
-                self.scheduler.shutdown()
-                logger.info("Scheduler stopped successfully")
+                # MODIFICATION: Make shutdown non-blocking
+                self.scheduler.shutdown(wait=False)
+                logger.info("Scheduler shutdown initiated (non-blocking).")
         except Exception as e:
-            logger.error(f"Error stopping scheduler: {e}", exc_info=True)
-            raise
-
+            # Log error but don't re-raise if the goal is quick exit.
+            logger.error(f"Error initiating scheduler shutdown: {e}", exc_info=True)
 
 scheduler_service = SchedulerService()  # Single instance

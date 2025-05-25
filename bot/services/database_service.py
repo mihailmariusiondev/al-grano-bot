@@ -1,6 +1,5 @@
 import aiosqlite
 from typing import Optional, List, Dict
-
 from bot.utils.constants import MAX_RECENT_MESSAGES
 from ..utils.logger import logger
 
@@ -42,6 +41,10 @@ class DatabaseService:
                     first_name TEXT,
                     last_name TEXT,
                     is_admin BOOLEAN DEFAULT FALSE,
+                    last_text_simple_op_time TIMESTAMP NULL,
+                    last_advanced_op_time TIMESTAMP NULL,
+                    advanced_op_today_count INTEGER NOT NULL DEFAULT 0,
+                    advanced_op_count_reset_date DATE NULL,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
@@ -154,10 +157,31 @@ class DatabaseService:
                     # Similar handling as above
                     pass # Or self.logger.warning("Could not add summary_type, table might not exist or other issue.")
 
+            # Add new columns to telegram_user if they don't exist
+            user_columns_to_add = {
+                "last_text_simple_op_time": "TIMESTAMP NULL",
+                "last_advanced_op_time": "TIMESTAMP NULL",
+                "advanced_op_today_count": "INTEGER NOT NULL DEFAULT 0",
+                "advanced_op_count_reset_date": "DATE NULL",
+            }
+
+            for col_name, col_type in user_columns_to_add.items():
+                try:
+                    await self.conn.execute(
+                        f"ALTER TABLE telegram_user ADD COLUMN {col_name} {col_type}"
+                    )
+                    self.logger.info(f"Added column {col_name} to telegram_user table.")
+                except aiosqlite.OperationalError as e:
+                    if "duplicate column" not in str(e).lower():
+                        self.logger.warning(f"Could not add column {col_name} to telegram_user: {e}")
+                    else:  # Column already exists
+                        pass
+
             await self.conn.commit()
             self.logger.info("Database initialized successfully")
+
         except Exception as e:
-            self.logger.error(f"Failed to initialize database: {e}")
+            self.logger.error(f"Failed to initialize database: {e}", exc_info=True)
             raise
 
     async def execute(
@@ -316,8 +340,10 @@ class DatabaseService:
                 # Crear nuevo usuario
                 insert_query = """
                     INSERT INTO telegram_user (
-                        user_id, username, first_name, last_name
-                    ) VALUES (?, ?, ?, ?)
+                        user_id, username, first_name, last_name,
+                        last_text_simple_op_time, last_advanced_op_time,
+                        advanced_op_today_count, advanced_op_count_reset_date
+                    ) VALUES (?, ?, ?, ?, NULL, NULL, 0, NULL)
                 """
                 await self.execute(
                     insert_query, (user_id, username, first_name, last_name)
@@ -329,7 +355,7 @@ class DatabaseService:
                 )
                 return user
         except Exception as e:
-            self.logger.error(f"Error in get_or_create_user: {e}")
+            self.logger.error(f"Error in get_or_create_user: {e}", exc_info=True)
             raise
 
     async def get_user(self, user_id: int):
@@ -341,6 +367,28 @@ class DatabaseService:
         except Exception as e:
             self.logger.error(f"Error fetching user: {e}")
             return None
+
+    async def update_user_fields(self, user_id: int, fields_to_update: Dict) -> None:
+        """Update specific fields for a user."""
+        if not self.conn:
+            raise RuntimeError("Database not initialized")
+        if not fields_to_update:
+            return
+
+        set_clauses = [f"{key} = ?" for key in fields_to_update.keys()]
+        params = list(fields_to_update.values()) + [user_id]
+
+        query = f"""
+            UPDATE telegram_user
+            SET {", ".join(set_clauses)}, updated_at = CURRENT_TIMESTAMP
+            WHERE user_id = ?
+        """
+        try:
+            await self.execute(query, tuple(params))
+            self.logger.info(f"User {user_id} updated with fields: {', '.join(fields_to_update.keys())}")
+        except Exception as e:
+            self.logger.error(f"Error updating user {user_id}: {e}", exc_info=True)
+            raise
 
     async def get_chat_state(self, chat_id: int) -> dict:
         """Get chat state, create if not exists"""

@@ -5,6 +5,7 @@ channels:
 dependencies:
   - python=3.12
   - pip
+  - certifi # Add certifi here as a primary Conda dependency
   - pip:
       - python-telegram-bot
       - python-dotenv

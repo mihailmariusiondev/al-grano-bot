@@ -13,24 +13,24 @@ El proyecto busca mejorar la eficiencia con la que los usuarios consumen informa
 - **Dificultad para procesar documentos largos**: Leer documentos extensos (PDF, DOCX) para encontrar información específica es tedioso. El bot puede extraer el texto y resumirlo.
 - **Análisis rápido de imágenes**: Obtener una descripción o análisis de una imagen.
 - **Necesidad de acceso rápido a la esencia del contenido**: Los usuarios a menudo solo necesitan una idea general de un mensaje, artículo o vídeo antes de decidir si profundizan en él.
-- **Uso equitativo de recursos de IA**: Gestionar el acceso a funcionalidades costosas (como transcripciones o análisis de IA complejos) para evitar abusos y controlar costes operativos.
+- **Uso equitativo de recursos de IA**: Gestionar el acceso a funcionalidades costosas (como transcripciones o análisis de IA complejos) para evitar abusos y controlar costes operativos, ahora implementado a través del sistema de límites del comando `/summarize`.
 
-## 3. Cómo Debería Funcionar (Experiencia de Usuario)
+## 3. Cómo Funciona (Experiencia de Usuario Actual)
 
 - **Interacción Sencilla**: Los usuarios interactúan con el bot principalmente mediante el comando `/summarize` y respondiendo a mensajes. Otros comandos gestionan configuraciones o proveen ayuda.
 - **Respuesta Contextual para `/summarize`**:
-  - Al enviar `/summarize` sin responder a un mensaje, el bot resume los últimos mensajes del chat.
-  - Al responder a un mensaje específico con `/summarize`, el bot procesa y resume ese mensaje (texto, enlace, archivo de audio/video/documento, imagen).
+  - Al enviar `/summarize` sin responder a un mensaje, el bot resume los últimos mensajes del chat (Operación de Texto Simple).
+  - Al responder a un mensaje específico con `/summarize`, el bot procesa y resume ese mensaje (texto, enlace, archivo de audio/video/documento, imagen), clasificándolo como Operación de Texto Simple o Contenido Avanzado según corresponda.
 - **Información Progresiva**: El bot envía mensajes de estado ("Procesando...", "Transcribiendo...", etc.) para mantener al usuario informado durante operaciones largas.
 - **Resúmenes Claros**: Los resúmenes se presentan en un formato legible, utilizando Markdown para mejorar la estructura.
-- **Gestión de Límites para Usuarios Gratuitos**:
-  - Los usuarios gratuitos tendrán cooldowns entre usos del comando `/summarize`. La duración del cooldown dependerá de si la tarea es simple (resumir chat/texto) o compleja/costosa (resumir audio/video/documento/imagen/YouTube).
-  - Para operaciones complejas/costosas, los usuarios gratuitos tendrán un límite diario de usos.
-  - El bot informará claramente al usuario si un cooldown está activo o si ha alcanzado su límite diario.
-- **Acceso sin Restricricciones para Administradores**: Los administradores del bot podrán usar el comando `/summarize` sin cooldowns ni límites diarios.
+- **Gestión de Límites para Usuarios Gratuitos (Implementada)**:
+  - Los usuarios gratuitos tienen cooldowns entre usos del comando `/summarize`. La duración del cooldown depende de si la tarea es simple (resumir chat/texto: cooldown más corto) o compleja/costosa (resumir audio/video/documento/imagen/YouTube: cooldown más largo).
+  - Para operaciones complejas/costosas, los usuarios gratuitos tienen un límite diario de usos (actualmente 5).
+  - El bot informa claramente al usuario si un cooldown está activo o si ha alcanzado su límite diario.
+- **Acceso sin Restricciones para Administradores**: Los administradores del bot pueden usar el comando `/summarize` sin cooldowns ni límites diarios.
 - **Configuración Personalizada**: Los administradores pueden activar/desactivar resúmenes diarios y elegir entre resúmenes largos o cortos para el chat.
 - **Manejo de Errores Amigable**: Si ocurre un error (ej. formato de archivo no soportado, URL inválida), el bot informa al usuario de manera clara.
-- **Comandos de Ayuda**: El comando `/help` proporciona una guía completa sobre cómo usar el bot. El comando `/about` (a implementar) dará información sobre el bot.
+- **Comandos de Ayuda**: El comando `/help` proporciona una guía completa sobre cómo usar el bot. El comando `/about` (próximo a implementar) dará información sobre el bot.
 - **Resúmenes Diarios**: Si están activados, los usuarios reciben un resumen de la actividad del chat del día anterior a una hora programada.
 
 ## 4. Objetivos de la Experiencia de Usuario (UX)
@@ -40,5 +40,5 @@ El proyecto busca mejorar la eficiencia con la que los usuarios consumen informa
 - **Facilidad de Uso**: Asegurar que la interacción con el bot sea intuitiva y no requiera conocimientos técnicos avanzados.
 - **Fiabilidad**: El bot debe funcionar de manera consistente y predecible.
 - **Utilidad**: Los resúmenes y la información proporcionada deben ser valiosos para el usuario.
-- **Equidad y Sostenibilidad**: Implementar un sistema de límites justo para usuarios gratuitos que permita mantener el servicio operativo y gestionar los costes de las APIs de IA.
+- **Equidad y Sostenibilidad**: Implementar un sistema de límites justo para usuarios gratuitos que permita mantener el servicio operativo y gestionar los costes de las APIs de IA. Esto ya está en funcionamiento.
 - **Transparencia**: Informar claramente a los usuarios sobre cualquier limitación de uso.
