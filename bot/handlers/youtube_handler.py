@@ -7,6 +7,7 @@ from youtube_transcript_api import (
     VideoUnavailable,
 )
 import logging
+from typing import Optional
 
 from bot.utils.constants import YOUTUBE_REGEX
 
@@ -14,7 +15,7 @@ logging = logging.getLogger(__name__)
 
 async def youtube_handler(
     update: Update, context: CallbackContext, youtube_url: str
-) -> None:
+) -> Optional[str]:
     """
     Handle YouTube video transcription requests.
 
@@ -22,6 +23,9 @@ async def youtube_handler(
         update: Telegram update object
         context: Callback context
         youtube_url: URL of the YouTube video
+
+    Returns:
+        Optional[str]: Transcription text if successful, None otherwise
     """
     user_id = update.effective_user.id
 
@@ -46,7 +50,7 @@ async def youtube_handler(
 
         # Fetch and process transcript
         transcript_data = transcript.fetch()
-        transcription = " ".join([entry["text"] for entry in transcript_data])
+        transcription = " ".join([entry.text for entry in transcript_data])
         logging.info(f"Transcription fetched, length: {len(transcription)} chars")
 
         return transcription
@@ -66,6 +70,8 @@ async def youtube_handler(
         await update.message.chat.send_message(
             "Ocurrió un error inesperado al procesar la transcripción."
         )
+
+    return None
 
 
 def extract_video_id(youtube_url):

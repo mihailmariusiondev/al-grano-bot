@@ -11,6 +11,7 @@ from bot.commands import (
     help_command,
     summarize_command,
     toggle_daily_summary_command,
+    toggle_summary_type_command,
 )
 from bot.handlers import (
     error_handler,
@@ -21,7 +22,6 @@ from bot.utils.logger import logger
 from bot.services.database_service import db_service
 from bot.services.scheduler_service import scheduler_service
 from bot.services.message_service import message_service
-from bot.commands.toggle_summary_type_command import toggle_summary_type_command
 import asyncio
 
 
@@ -45,6 +45,29 @@ class TelegramBot:
 
             self.application: Optional[Application] = None
             self.initialized = True
+
+    async def _custom_cleanup(self, application: Optional[Application] = None):
+        """Custom cleanup logic to be called by PTB's post_shutdown."""
+        self.logger.info("Executing custom cleanup via PTB post_shutdown...")
+
+        if scheduler_service.scheduler.running:
+            self.logger.info("Stopping scheduler service...")
+            scheduler_service.stop() # This is sync but now initiates non-blocking scheduler shutdown
+            self.logger.info("Scheduler service stop initiated.")
+        else:
+            self.logger.info("Scheduler service was not running or already stopped.")
+
+        if db_service and not db_service.closed:
+            self.logger.info("Closing database service connection...")
+            try:
+                await db_service.close()
+                self.logger.info("Database service connection closed.")
+            except Exception as e:
+                self.logger.error(f"Error closing database service during cleanup: {e}", exc_info=True)
+        else:
+            self.logger.info("Database service was already closed or not initialized.")
+
+        self.logger.info("Custom cleanup via PTB post_shutdown finished.")
 
     def register_handlers(self):
         if not self.initialized:
@@ -82,13 +105,14 @@ class TelegramBot:
         if not self.initialized:
             raise RuntimeError("Telegram bot not initialized")
         try:
-            self.logger.info("Starting bot initialization...")
+            self.logger.info("Building Telegram Bot application...")
             self.application = (
                 ApplicationBuilder()
                 .token(self.token)
                 .read_timeout(30)
                 .write_timeout(30)
                 .connect_timeout(30)
+                .post_shutdown(self._custom_cleanup)
                 .build()
             )
             self.register_handlers()
@@ -96,28 +120,30 @@ class TelegramBot:
             # Initialize message service with bot instance
             message_service.initialize(self.application.bot)
 
-            # Create and set event loop
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-
-            # Start scheduler in the event loop
-            loop.run_until_complete(self._start_scheduler())
+            # The event loop is set in main.py. Ensure scheduler starts on that loop.
+            # This needs to run on the event loop that PTB will use.
+            current_loop = asyncio.get_event_loop_policy().get_event_loop()
+            if current_loop.is_running():
+                 asyncio.create_task(self._start_scheduler())
+            else:
+                 current_loop.run_until_complete(self._start_scheduler())
 
             self.logger.info("Starting bot polling...")
             self.application.run_polling()
+            self.logger.info("Bot polling has stopped.")
 
         except Exception as e:
-            self.logger.error(f"Failed to start bot: {e}", exc_info=True)
+            self.logger.error(f"Failed to start or run bot: {e}", exc_info=True)
             raise
 
     async def stop(self):
         if self.application:
-            self.logger.info("Stopping bot...")
-            # Stop the scheduler
-            scheduler_service.stop()
+            self.logger.info("TelegramBot.stop() called (programmatic stop)...")
+            # Application.stop() will trigger the shutdown sequence including post_shutdown hooks.
             await self.application.stop()
-            await db_service.close()
-            self.logger.info("Bot stopped successfully")
+            self.logger.info("TelegramBot.stop() finished (delegated to PTB shutdown).")
+        else:
+            self.logger.info("TelegramBot.stop() called, but application not initialized.")
 
 
 telegram_bot = TelegramBot()

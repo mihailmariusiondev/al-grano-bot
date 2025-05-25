@@ -13,6 +13,7 @@
 - **Base de Datos**:
   - SQLite
   - Driver asíncrono: `aiosqlite`
+  - Utilizada para almacenar usuarios (incluyendo estado de admin y datos de uso para límites), mensajes, y estados de chat.
 - **Programación de Tareas**: `APScheduler` (para resúmenes diarios).
 - **Procesamiento Multimedia y de Archivos**:
   - `ffmpeg`: Para compresión de audio (a Opus) y extracción de audio de vídeos (a WAV PCM). Se invoca como un proceso de línea de comandos.
@@ -26,7 +27,7 @@
 - **Serialización/Formato de Datos**: JSON (implícito en interacciones con APIs), Markdown (para formatear mensajes de respuesta).
 - **Gestión de Entorno y Dependencias**: Conda (según `environment.yml`), con `pip` para algunas dependencias.
 - **Tipado Estático**: Módulo `typing` de Python.
-- **Utilidades de Fecha/Hora**: `datetime`, `pytz` (para manejo de zonas horarias, específicamente "Europe/Madrid").
+- **Utilidades de Fecha/Hora**: `datetime`, `date` (de `datetime`), `pytz` (para manejo de zonas horarias, específicamente "Europe/Madrid").
 
 ## 2. Configuración de Desarrollo (Inferida)
 
@@ -37,6 +38,7 @@
   - `DEBUG_MODE` (opcional, por defecto `false`): Si es `true`, establece el nivel de log a DEBUG.
   - `LOG_LEVEL` (opcional, por defecto `INFO`): Nivel de logging (ej. `INFO`, `DEBUG`, `WARNING`).
   - `ENVIRONMENT` (opcional, por defecto `development`): Entorno de ejecución.
+  - `AUTO_ADMIN_USER_IDS_CSV` (opcional): Lista de IDs de usuario de Telegram separados por coma que serán configurados automáticamente como administradores del bot.
 - Dependencias listadas en `environment.yml` deben estar instaladas.
 - `ffmpeg` debe estar instalado y accesible en el PATH del sistema para que funcionen las utilidades de `media_utils.py`.
 - El script principal para ejecutar el bot es `main.py`.
@@ -45,10 +47,16 @@
 
 - **Límites de la API de Telegram**:
   - Tamaño máximo de mensajes de texto (gestionado con `send_long_message`).
-  - Límites de frecuencia de envío (rate limits), aunque no hay un manejo explícito más allá del cooldown por comando.
+  - Límites de frecuencia de envío (rate limits), aunque no hay un manejo explícito más allá de la lógica de cooldowns implementada a nivel de bot.
 - **Límites de la API de OpenAI**:
   - Límites de tokens para los modelos (ej. GPT-4o tiene un límite de 128k tokens). `OpenAIService` tiene una constante `MAX_INPUT_CHARS` para tratar de manejar esto, y `summarize_large_document` divide el texto si es necesario.
   - Límites de frecuencia y cuotas de uso de la API.
+- **Límites Implementados por el Bot (para Usuarios Gratuitos)**:
+  - El comando `/summarize` tiene cooldowns diferenciados:
+    - `COOLDOWN_TEXT_SIMPLE_SECONDS` (120s) para operaciones simples (resumen de chat, texto plano).
+    - `COOLDOWN_ADVANCED_SECONDS` (600s) para operaciones avanzadas/costosas (multimedia, documentos, URLs).
+  - Límite diario de `DAILY_LIMIT_ADVANCED_OPS` (5) para operaciones avanzadas/costosas.
+  - Estos límites son gestionados por el bot y almacenados en la base de datos SQLite.
 - **Procesamiento de Archivos Grandes**:
   - `MAX_FILE_SIZE` (20MB) se define en `constants.py` para limitar el tamaño de archivos de audio/vídeo procesados localmente antes de enviarlos a OpenAI.
   - El procesamiento de documentos grandes (`summarize_large_document`) divide el texto en chunks para evitar exceder los límites de tokens de OpenAI, usando GPT-4o-mini para chunks intermedios y GPT-4o para el resumen final.
@@ -79,11 +87,12 @@
 - **`OpenAIService`**:
   - Utiliza `client.chat.completions.create` para interactuar con los modelos de lenguaje.
   - Utiliza `client.audio.transcriptions.create` para el modelo Whisper.
-  - Maneja la lógica de prompts dinámicos según el tipo de resumen y el idioma.
+  - Maneja la lógica de prompts dinámicos según el tipo de resumen y el idioma (actualmente fijo a Español).
   - Implementa una estrategia de "map-reduce" para documentos grandes (`summarize_large_document`), resumiendo chunks y luego resumiendo los resúmenes.
 - **`DatabaseService`**:
   - Usa `aiosqlite` para todas las interacciones con la BD.
   - Define el esquema de la BD, incluyendo triggers para `updated_at` y limpieza de mensajes antiguos.
   - Proporciona métodos CRUD asíncronos y consultas específicas.
+  - Almacena y gestiona datos de uso de los usuarios para el sistema de límites del comando `/summarize`, incluyendo `last_text_simple_op_time`, `last_advanced_op_time`, `advanced_op_today_count`, y `advanced_op_count_reset_date` en la tabla `telegram_user`.
 - **`Logger`**: Configura un logger raíz y permite obtener loggers específicos por módulo, con handlers para consola y archivos rotatorios. El nivel de log y el formato son configurables.
 - **`SchedulerService`**: Configura `AsyncIOScheduler` de `APScheduler` con un `CronTrigger` para ejecutar `send_daily_summaries` a una hora fija en la zona horaria "Europe/Madrid".
