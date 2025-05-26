@@ -14,8 +14,6 @@
   - Transcribir y resumir mensajes de voz y archivos de audio.
   - Extraer audio, transcribir y resumir contenido de vídeos y notas de vídeo.
   - Extraer texto y resumir documentos (PDF, DOCX, TXT).
-  - Analizar y describir imágenes (con un prompt de análisis fijo).
-  - Resumir encuestas.
 - **Gestión de Uso Equitativo**: Implementar un sistema de límites (cooldowns, cuotas diarias) para el comando `/summarize` para usuarios gratuitos, diferenciando entre operaciones simples y costosas, mientras se otorga acceso ilimitado a administradores.
 - **Resúmenes Diarios Automáticos**: Ofrecer la opción de recibir un resumen diario automático de la actividad del chat.
 - **Personalización de Resúmenes**: Permitir a los administradores elegir entre formatos de resumen largos (detallados) y cortos (concisos) para el chat.
@@ -25,17 +23,18 @@
 ## 3. Alcance del Proyecto
 
 - **Funcionalidades Centrales**:
-  - Comandos de inicio (`/start`), ayuda (`/help`), información (`/about` - a implementar).
+  - Comandos de inicio (`/start`), ayuda (`/help`). (La implementación del comando `/about` ha sido diferida y no se incluirá en la ayuda por ahora).
   - Comando de resumen (`/summarize`) unificado con lógica interna para:
     - Actuar sobre mensajes recientes del chat o mensajes específicos respondidos.
-    - Manejar diferentes tipos de mensajes (texto, audio, vídeo, documentos, enlaces, imágenes, encuestas).
+    - Manejar diferentes tipos de mensajes (texto, audio, vídeo, documentos, enlaces). (El resumen de imágenes/fotos y encuestas ha sido eliminado del alcance).
     - Aplicar cooldowns y límites diarios para usuarios gratuitos basados en el tipo de operación (simple vs. costosa).
     - Permitir uso ilimitado para administradores.
   - Comandos para activar/desactivar resúmenes diarios (`/toggle_daily_summary` - admin).
   - Comandos para cambiar el tipo de resumen (`/toggle_summary_type` - admin).
 - **Integraciones**:
   - API de Telegram.
-  - API de OpenAI (transcripción, análisis de imágenes, generación de resúmenes).
+  - **OpenRouter API**: Para modelos de lenguaje (ej. `deepseek/deepseek-r1:free`) utilizados en la generación de resúmenes.
+  - **API directa de OpenAI**: Exclusivamente para transcripción de audio con el modelo Whisper-1.
   - Librerías para procesar archivos, extraer contenido web y transcripciones de YouTube.
 - **Administración**:
   - Comandos restringidos a administradores.
@@ -47,8 +46,8 @@
 
 - El bot responde de manera fiable a los comandos.
 - Los resúmenes generados son precisos y útiles.
-- El bot maneja correctamente diferentes tipos de contenido para resumen.
+- El bot maneja correctamente diferentes tipos de contenido para resumen (según el alcance definido: texto, enlaces, audio, video, documentos).
 - El sistema de límites y cooldowns para `/summarize` funciona según lo diseñado y es comunicado claramente a los usuarios.
 - Los resúmenes diarios se entregan puntualmente.
 - El sistema es estable y maneja los errores de forma adecuada.
-- Se gestionan eficazmente los costes de API mediante el sistema de límites.
+- Se gestionan eficazmente los costes de API mediante el sistema de límites y la elección de modelos (e.g. DeepSeek vía OpenRouter para resúmenes, Whisper para transcripciones).

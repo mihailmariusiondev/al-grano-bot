@@ -2,62 +2,59 @@
 
 ## 1. Enfoque de Trabajo Actual
 
-Con la implementación del comando `/summarize` unificado con límites diferenciados completada, el enfoque inmediato es abordar una tarea de menor envergadura pero necesaria para la completitud básica del bot: **la implementación del comando `/about`**.
+El enfoque de trabajo actual es ejecutar un bloque de tareas interconectadas que refinarán las capacidades del bot y su infraestructura de IA. Estas tareas son:
 
-Esto implica:
+1.  **Actualizar `HELP_MESSAGE` en `bot/commands/help_command.py`**: Modificar el mensaje de ayuda para eliminar referencias al comando `/about` (diferido), y a las funcionalidades de resumen de fotos y encuestas (eliminadas del alcance).
+2.  **Refactorización de Prompts**: Externalizar los prompts del sistema desde `OpenAIService` a un nuevo directorio `bot/prompts/`.
+3.  **Refactorización del Sistema de IA**: Migrar el procesamiento de LLM a OpenRouter (usando `deepseek/deepseek-r1:free` o similar) y mantener la API directa de OpenAI exclusivamente para Whisper (transcripción). Esto implica actualizar la configuración de API keys y la lógica en `OpenAIService`.
+4.  **Eliminación de Funcionalidades de Fotos y Encuestas**: Remover todo el código asociado al resumen de estos tipos de contenido de la base del código.
+5.  **Actualización Completa del Banco de Memoria**: Asegurar que todos los documentos del Memory Bank reflejen con precisión el estado del proyecto después de completar las tareas anteriores y planificar las nuevas (esta operación actual).
 
-- Crear un nuevo archivo de comando `about_command.py`.
-- Definir el contenido del mensaje de `/about` (puede reutilizar/adaptar parte del `HELP_MESSAGE`).
-- Registrar el nuevo `CommandHandler` en `bot.py`.
-
-Una vez completado, se evaluará la priorización de las "OTRAS FUNCIONALIDADES PENDIENTES" listadas en `progress.md`, siendo el "Soporte Multi-idioma Completo" un candidato probable para la siguiente tarea de mayor envergadura.
+**La tarea actual es la "Actualización Completa del Banco de Memoria" (punto 5 de la lista).**
+**Una vez completada esta actualización, la siguiente tarea inmediata del bloque será la "Actualización de `HELP_MESSAGE`" (punto 1 de la lista).**
 
 ## 2. Cambios Recientes
 
-- **Finalización de la Funcionalidad de Límites para `/summarize`**:
-  - El comando `/summarize` ha sido completamente refactorizado.
-  - Distingue entre usuarios administradores (sin límites) y usuarios gratuitos.
-  - Clasifica las operaciones en "Texto Simple" (cooldown corto, sin límite diario) y "Contenido Avanzado/Costoso" (cooldown largo, límite diario de 5 usos).
-  - La `DatabaseService` ha sido actualizada para almacenar y gestionar `last_text_simple_op_time`, `last_advanced_op_time`, `advanced_op_today_count`, y `advanced_op_count_reset_date` por usuario.
-  - La lógica de reseteo diario para `advanced_op_today_count` está implementada.
-  - Se han implementado mensajes claros para el usuario sobre cooldowns y límites.
-- **Actualización del Banco de Memoria**: Reflejando la finalización de la tarea prioritaria y redefiniendo los próximos pasos.
+- **Decisión Estratégica de Refactorización y Enfoque**:
+  - Se ha decidido refactorizar el sistema de IA para utilizar OpenRouter con un modelo como `deepseek/deepseek-r1:free` para las tareas de resumen, buscando flexibilidad y optimización de costos.
+  - La API directa de OpenAI se usará exclusivamente para las transcripciones con Whisper.
+  - Como parte de un reenfoque en las funcionalidades principales de resumen de texto y multimedia, se ha decidido eliminar el soporte para resumir fotos y encuestas.
+  - La implementación del comando `/about` se ha diferido indefinidamente.
+- **Planificación del Bloque de Trabajo Actual**: Se ha definido el conjunto de 5 tareas (listadas arriba) para implementar estos cambios.
+- **Actualización del Banco de Memoria**: Esta misma actividad está en curso para alinear la documentación con estas nuevas directrices y planes.
 
-## 3. Próximos Pasos (Para el comando `/about`)
+## 3. Próximos Pasos (Inmediatamente después de esta actualización del Memory Bank)
 
-1.  **Crear `bot/commands/about_command.py`**:
-    - Importar `Update`, `ContextTypes`, `log_command`, `logger`.
-    - Definir una constante `ABOUT_MESSAGE` con el texto deseado. El mensaje en `HELP_MESSAGE` puede ser una base: "Este bot ha sido creado por [@Arkantos2374](https://t.me/Arkantos2374) con mucho esfuerzo. Si deseas apoyar el desarrollo y mantenimiento del bot, puedes realizar una donación vía [PayPal](https://paypal.me/mariusmihailion). ¡Gracias por tu apoyo!"
-    - Crear la función asíncrona `about_command(update: Update, context: ContextTypes.DEFAULT_TYPE)`.
-    - Usar el decorador `@log_command()`. No necesita `@bot_started()` si se considera un comando informativo básico.
-    - Enviar `ABOUT_MESSAGE` con `parse_mode="Markdown"`.
-2.  **Registrar el Comando en `bot/bot.py`**:
-    - Importar `about_command` desde `bot.commands`.
-    - Añadir `self.application.add_handler(CommandHandler("about", about_command))` en `register_handlers`.
-3.  **Actualizar `bot/commands/__init__.py`**:
-    - Añadir `from .about_command import *`.
-4.  **Probar el nuevo comando.**
-5.  **Actualizar `progress.md` y `activeContext.md`** una vez implementado.
+1.  **Iniciar la Tarea: Actualizar `HELP_MESSAGE` en `bot/commands/help_command.py`**.
+    - Abrir el archivo `bot/commands/help_command.py`.
+    - Localizar la constante `HELP_MESSAGE`.
+    - Modificar el contenido de `HELP_MESSAGE`:
+      - Eliminar cualquier mención o descripción del comando `/about`.
+      - En la sección que lista los "Tipos de Contenido que el Bot Puede Resumir" (o similar), eliminar "Fotos" (o "Imágenes") y "Encuestas".
+      - Asegurar que la explicación del uso del comando `/summarize` (tanto para historial de chat como para mensajes específicos respondidos) no haga referencia a fotos o encuestas como contenido procesable.
+      - Verificar que la información sobre límites de uso (cooldowns, cuotas diarias) sea precisa y esté actualizada.
+      - Conservar la información de autoría y el enlace de donaciones.
+    - Revisar la totalidad del `HELP_MESSAGE` para garantizar su coherencia, claridad y corrección gramatical tras los cambios.
+2.  Una vez completada y verificada la actualización de `HELP_MESSAGE`, se procederá con la siguiente tarea del bloque: Refactorización de Prompts.
 
 ## 4. Decisiones y Consideraciones Activas
 
-- **Contenido exacto del mensaje `/about`**: Aunque se puede basar en el `HELP_MESSAGE`, decidir si se quiere añadir algo más o modificarlo ligeramente.
-- **Prioridad post-`/about`**: Confirmar si el "Soporte Multi-idioma" será el siguiente gran bloque de trabajo o si se intercalará otra mejora menor.
+- **Modelo en OpenRouter**: Se utilizará `deepseek/deepseek-r1:free` (o un modelo similar de DeepSeek disponible en OpenRouter) como objetivo inicial para resúmenes.
+- **Estructura de Directorio para Prompts**: Se creará `bot/prompts/` y dentro un archivo como `summary_prompts.py` (o `system_prompts.py`) para albergar los prompts del sistema.
+- **Impacto de la Eliminación de Funcionalidades**: La eliminación de resúmenes de fotos y encuestas simplificará `summarize_command.py`, `get_message_type.py`, y permitirá la eliminación de `photo_handler.py`.
+- **API Keys**: Se requerirán dos claves: `OPENROUTER_API_KEY` y `OPENAI_API_KEY_FOR_WHISPER`.
 
 ## 5. Patrones y Preferencias Importantes (Observados y a Mantener/Introducir)
 
-- **Modularidad**: Mantener la separación de responsabilidades (comandos, handlers, servicios).
+- **Modularidad**: Esencial durante la refactorización de `OpenAIService` y la externalización de prompts. Mantener la separación de responsabilidades.
 - **Singletons para Servicios**: Continuar usando este patrón.
-- **Manejo Asíncrono**: Sigue siendo crucial.
-- **Configuración Externalizada**: Mantener.
+- **Manejo Asíncrono**: Crucial.
+- **Configuración Externalizada**: Mantener y adaptar para las nuevas API keys (`.env` y `config.py`).
 - **Logging Detallado**: Mantener.
-- **Base de Datos SQLite**: Sigue siendo la elección.
-- **Tipado Estático**: Mantener.
-- **Claridad del Propósito del Bot**: La separación del "Modo Compañero" refuerza la identidad de "Al-Grano Bot" como una herramienta de resumen.
+- **Claridad del Propósito del Bot**: La eliminación de funcionalidades secundarias (fotos, encuestas) refuerza la identidad de "Al-Grano Bot" como una herramienta especializada en resúmenes de contenido textual y multimedia principal.
 
 ## 6. Aprendizajes e Ideas del Proyecto (Recientes)
 
-- La implementación de un sistema de límites de uso, aunque compleja, es factible y crucial para la gestión de recursos y la equidad, especialmente para servicios que dependen de APIs de pago.
-- La claridad en los mensajes al usuario sobre las limitaciones (cooldowns, cuotas) es fundamental para una buena experiencia de usuario.
-- El diseño de la base de datos para soportar estos límites (tracking de tiempos de uso y contadores) debe ser considerado cuidadosamente desde el inicio de la planificación de la feature.
-- La refactorización de un comando central como `/summarize` requiere una atención minuciosa para asegurar que todos los casos de uso anteriores sigan funcionando correctamente bajo la nueva lógica.
+- La transición a plataformas como OpenRouter puede ofrecer mayor flexibilidad en la elección de modelos de IA y una potencial optimización de costos operativos.
+- Enfocar el bot en un conjunto más reducido y central de funcionalidades mejora la calidad y la experiencia del usuario.
+- La gestión de prompts es crítica; externalizarlos mejora la mantenibilidad.

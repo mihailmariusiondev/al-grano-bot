@@ -10,55 +10,67 @@ El "Al-Grano Bot" sigue una arquitectura modular enfocada en la funcionalidad de
   - Clasificación del tipo de operación de resumen (simple/costosa).
   - Aplicación de límites de uso (cooldowns, cuotas diarias) para usuarios gratuitos.
   - Delegación a handlers de contenido específico.
-- **Capa de Manejadores de Contenido (`bot/handlers/`)**: Módulos para procesar tipos específicos de contenido para resumen (audio, video, documento, imagen, artículo web, YouTube). Son invocados por el comando `/summarize`. El `message_handler.py` genérico (en `bot/commands/`) guarda mensajes para el contexto de resúmenes de chat.
+  - (El comando `/about` ha sido diferido y no se implementará).
+- **Capa de Manejadores de Contenido (`bot/handlers/`)**: Módulos para procesar tipos específicos de contenido para resumen (audio, video, documento, artículo web, YouTube). Son invocados por el comando `/summarize`. El `message_handler.py` genérico (en `bot/commands/`) guarda mensajes para el contexto de resúmenes de chat. (El `photo_handler.py` será eliminado, y el manejo de encuestas directamente en `summarize_command.py` también será removido).
 - **Capa de Servicios (`bot/services/`)**:
-  - `DatabaseService`: Gestiona operaciones con SQLite. Almacena y recupera datos de uso de los usuarios para la funcionalidad de límites del comando `/summarize` (tiempos de último uso, contadores diarios, etc.).
-  - `OpenAIService`: Interactúa con OpenAI para resumen, transcripción y análisis de imágenes.
-  - `DailySummaryService`, `SchedulerService`, `MessageService`: Mantienen sus roles actuales.
+  - `DatabaseService`: Gestiona operaciones con SQLite. Almacena y recupera datos de uso de los usuarios para la funcionalidad de límites del comando `/summarize`.
+  - `OpenAIService`:
+    - Utilizará un cliente `openai.AsyncOpenAI` configurado para **OpenRouter API** (ej. con `deepseek/deepseek-r1:free`) para todas las tareas de generación de resúmenes.
+    - Utilizará otro cliente `openai.AsyncOpenAI` configurado para la **API directa de OpenAI** exclusivamente para transcripciones con el modelo Whisper-1.
+  - `DailySummaryService`, `SchedulerService`, `MessageService`: Mantienen sus roles actuales, pero `DailySummaryService` usará el `OpenAIService` refactorizado.
 - **Capa de Utilidades (`bot/utils/`)**: Funciones auxiliares.
-- **Configuración (`bot/config.py`)**: Gestión de configuraciones.
+- **Capa de Prompts (`bot/prompts/`)**: (Nueva) Directorio que contendrá los prompts del sistema para los modelos de IA, externalizados desde `OpenAIService`. Se importarán desde un módulo como `bot.prompts.summary_prompts`.
+- **Configuración (`bot/config.py`)**: Gestión de configuraciones, incluyendo las nuevas API keys.
 - **Punto de Entrada (`main.py`)**: Inicialización.
 
 ## 2. Decisiones Técnicas Clave
 
 - **Framework del Bot**: `python-telegram-bot`.
-- **Procesamiento de IA**: OpenAI (GPT-4o, GPT-4o-mini, Whisper).
-- **Persistencia de Datos**: SQLite con `aiosqlite`. Se han añadido campos a `telegram_user` para gestionar los límites de uso del comando `/summarize`.
+- **Procesamiento de IA (Refactorizado)**:
+  - **OpenRouter API**: Para LLMs (ej. `deepseek/deepseek-r1:free` o similar) encargados de todas las tareas de generación de resúmenes.
+  - **API directa de OpenAI**: Exclusivamente para transcripción de audio con Whisper-1.
+- **Persistencia de Datos**: SQLite con `aiosqlite`.
 - **Programación Asíncrona**: `asyncio`, `async/await`.
-- **Gestión de Límites de Uso**: La lógica de cooldowns y cuotas diarias para el comando `/summarize` está implementada directamente dentro del manejador del comando, interactuando con `DatabaseService`. Esto ha reemplazado la funcionalidad del decorador `@cooldown` para este comando.
+- **Gestión de Límites de Uso**: Lógica de cooldowns y cuotas diarias en `summarize_command.py`.
 - **Procesamiento Multimedia y de Contenido**: `ffmpeg`, `python-docx`, `PyPDF2`, `readability-lxml`, `youtube-transcript-api`.
-- **Enfoque del Producto**: El bot se centrará exclusivamente en funcionalidades de resumen. Las capacidades de "asistente conversacional" se desarrollarán en un bot separado.
+- **Enfoque del Producto**: Foco exclusivo en resúmenes de texto y multimedia principal (audio, video, documentos, enlaces). Funcionalidades de resumen de fotos/imágenes y encuestas han sido eliminadas. El comando `/about` ha sido diferido.
+- **Externalización de Prompts**: Los prompts del sistema se moverán a un directorio dedicado (`bot/prompts/`) y se gestionarán en un módulo Python (e.g., `summary_prompts.py`).
 
 ## 3. Patrones de Diseño en Uso
 
-- **Singleton**: Para servicios.
-- **Command**: El comando `/summarize` encapsula una lógica de negocio significativamente compleja, incluyendo la gestión de estado de uso del usuario.
-- **Decorator**: El decorador `@cooldown` original ya no se aplica al comando `/summarize`. `@admin_command` se usa para otros comandos. `@log_command` y `@bot_started` se mantienen.
-- **Strategy (Implícito)**: Dentro de `/summarize`, la elección del handler de contenido específico. Adicionalmente, la estrategia para aplicar límites varía según el tipo de usuario y operación.
-- **Service Layer**: Mantenido.
-- **Repository (Parcialmente con `DatabaseService`)**: `DatabaseService` abstrae el acceso a los datos de usuarios y sus límites de uso.
+- **Singleton**: Para servicios (`DatabaseService`, `OpenAIService`, `SchedulerService`, `MessageService`, `Logger`, `Config`, `TelegramBot`).
+- **Command**: El comando `/summarize` encapsula lógica de negocio compleja.
+- **Decorator**: `@admin_command`, `@log_command`, `@bot_started`.
+- **Strategy (Implícito)**: Dentro de `/summarize`, la elección del handler de contenido y la lógica de IA a aplicar.
+- **Service Layer**: Mantenido y reforzado con la refactorización de `OpenAIService`.
+- **Repository (Parcialmente con `DatabaseService`)**: `DatabaseService` abstrae el acceso a datos.
 
 ## 4. Relaciones entre Componentes
 
 - `main.py` inicializa `Config`, `DatabaseService`, `TelegramBot`.
-- `TelegramBot` registra `CommandHandler`s. El `summarize_command` es el más complejo.
-- `summarize_command` utiliza `db_service` extensivamente para verificar y actualizar límites de uso antes de delegar a los handlers de contenido específico y a `openai_service`.
-- Los handlers de contenido en `bot/handlers/` siguen utilizando `openai_service`.
-- La separación del "Modo Compañero" significa que no habrá handlers dedicados a la conversación proactiva o menciones con respuesta conversacional en este bot.
+- `TelegramBot` registra `CommandHandler`s.
+- `summarize_command` utiliza `db_service` y delegará a `openai_service`.
+- Los handlers de contenido en `bot/handlers/` utilizan `openai_service` para transcripción y/o pasan contenido a `summarize_command` que luego usa `openai_service` para resumen. (El `photo_handler.py` será eliminado).
+- `OpenAIService` obtendrá prompts desde `bot/prompts/summary_prompts.py` (o similar).
+- `OpenAIService` gestionará dos instancias de cliente `AsyncOpenAI`: una para OpenRouter y otra para OpenAI directa (Whisper).
+- `Config` proveerá las API keys necesarias (`OPENROUTER_API_KEY`, `OPENAI_API_KEY_FOR_WHISPER`).
 
 ## 5. Rutas Críticas de Implementación
 
-- **Flujo del Comando `/summarize` (Implementado)**:
+- **Flujo del Comando `/summarize` (Modificado)**:
   1.  Recepción del comando.
-  2.  `summarize_command` identifica usuario (`db_service`).
-  3.  Si es admin, salta a procesamiento.
-  4.  Si es gratuito:
-      - Determina tipo de operación (simple/costosa) basado en si hay `reply_to_message` y el tipo de ese mensaje.
-      - Consulta `db_service` por `last_usage_time` y `daily_count` para ese tipo de operación. (También verifica y resetea `daily_count` si la fecha de reseteo es pasada).
-      - Verifica cooldown. Si falla, responde y termina.
-      - Verifica límite diario (si es operación costosa). Si falla, responde y termina.
-  5.  Procesa el resumen (delega a handler de contenido, luego a `openai_service`).
-  6.  Envía respuesta.
-  7.  Si es gratuito, actualiza `last_usage_time` y `daily_count` en `db_service`.
-- **Flujo de Resumen Diario**: Sin cambios significativos.
-- **Flujo de Guardado de Mensajes**: Sin cambios significativos.
+  2.  `summarize_command` identifica usuario y tipo de operación.
+  3.  Gestión de límites para usuarios gratuitos.
+  4.  Identificación del tipo de mensaje/contenido (texto, enlace, audio, video, documento).
+      - El manejo de fotos y encuestas será eliminado.
+  5.  Procesamiento del contenido:
+      - Para audio/video:
+        - Si es necesario, se usa `ffmpeg` para procesar.
+        - Se llama a `openai_service.transcribe_audio()` (usando API directa de OpenAI con Whisper).
+      - Para documentos/artículos/YouTube: Se extrae el texto.
+  6.  Generación del resumen:
+      - Se llama a `openai_service.get_summary()` o `openai_service.summarize_large_document()` (usando OpenRouter con DeepSeek o similar, y prompts externalizados).
+  7.  Envío de respuesta.
+  8.  Actualización de contadores de uso en `db_service`.
+- **Flujo de Resumen Diario**: Utilizará el `OpenAIService` refactorizado con OpenRouter/DeepSeek y prompts externalizados.
+- **Flujo de Guardado de Mensajes**: Sin cambios significativos, pero `get_message_type` no incluirá `photo` ni `poll`.

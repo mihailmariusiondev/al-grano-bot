@@ -4,95 +4,82 @@
 
 - **Lenguaje de Programación**: Python 3.12 (según `environment.yml`).
 - **Framework del Bot de Telegram**: `python-telegram-bot`
-- **Inteligencia Artificial**:
-  - API de OpenAI:
-    - Modelos de Lenguaje (LLM): GPT-4o, GPT-4o-mini (para resúmenes, análisis de documentos).
-    - Modelo de Transcripción: Whisper-1 (para audio y vídeo).
-    - Análisis de Imágenes: GPT-4o (con capacidad de visión).
-  - Librería cliente: `openai`
+- **Inteligencia Artificial (IA)**:
+  - **Generación de Resúmenes (LLM)**:
+    - **OpenRouter API**: Se utilizará para acceder a Modelos de Lenguaje Grandes (LLM).
+    - Modelo LLM objetivo: `deepseek/deepseek-r1:free` (o un modelo similar de DeepSeek disponible y eficiente en OpenRouter).
+    - Librería cliente: `openai` (configurada con `base_url="https://openrouter.ai/api/v1"` y `api_key` de OpenRouter).
+  - **Transcripción de Audio**:
+    - **API directa de OpenAI**: Se utilizará exclusivamente para el modelo Whisper-1.
+    - Modelo de Transcripción: `whisper-1`.
+    - Librería cliente: `openai` (configurada con `api_key` de OpenAI específica para Whisper).
+  - _Nota: El análisis de imágenes con GPT-4o y el uso de GPT-4o/GPT-4o-mini para resúmenes directos vía API de OpenAI han sido eliminados/reemplazados._
 - **Base de Datos**:
   - SQLite
   - Driver asíncrono: `aiosqlite`
-  - Utilizada para almacenar usuarios (incluyendo estado de admin y datos de uso para límites), mensajes, y estados de chat.
+  - Utilizada para almacenar usuarios (estado de admin, datos de uso para límites), mensajes, y estados de chat.
 - **Programación de Tareas**: `APScheduler` (para resúmenes diarios).
 - **Procesamiento Multimedia y de Archivos**:
-  - `ffmpeg`: Para compresión de audio (a Opus) y extracción de audio de vídeos (a WAV PCM). Se invoca como un proceso de línea de comandos.
+  - `ffmpeg`: Para compresión de audio (a Opus) y extracción de audio de vídeos (a WAV PCM).
   - `youtube-transcript-api`: Para obtener transcripciones de vídeos de YouTube.
-  - `readability-lxml` (implícito por `readability.parse`): Para extraer contenido principal de artículos web.
+  - `readability-lxml`: Para extraer contenido principal de artículos web.
   - `python-docx`: Para leer archivos `.docx`.
   - `PyPDF2`: Para leer archivos `.pdf`.
-  - `aiohttp`: Para descargas asíncronas de archivos (ej. imágenes para análisis).
+  - `aiohttp`: Para descargas asíncronas de archivos (usado por `python-telegram-bot` internamente y potencialmente por `photo_handler` que será eliminado).
+- **Manejo de Prompts**: Prompts del sistema externalizados en archivos Python dentro de un directorio `bot/prompts/`.
 - **Manejo de Configuración**: `python-dotenv` (para cargar variables de entorno desde `.env`).
-- **Logging**: Módulo `logging` estándar de Python, con configuración personalizada y `RotatingFileHandler`.
-- **Serialización/Formato de Datos**: JSON (implícito en interacciones con APIs), Markdown (para formatear mensajes de respuesta).
-- **Gestión de Entorno y Dependencias**: Conda (según `environment.yml`), con `pip` para algunas dependencias.
+- **Logging**: Módulo `logging` estándar de Python, configurado a través de `bot/utils/logger.py`.
+- **Serialización/Formato de Datos**: JSON, Markdown.
+- **Gestión de Entorno y Dependencias**: Conda, `pip` (a través de `environment.yml`).
 - **Tipado Estático**: Módulo `typing` de Python.
-- **Utilidades de Fecha/Hora**: `datetime`, `date` (de `datetime`), `pytz` (para manejo de zonas horarias, específicamente "Europe/Madrid").
+- **Utilidades de Fecha/Hora**: `datetime`, `pytz`.
 
-## 2. Configuración de Desarrollo (Inferida)
+## 2. Configuración de Desarrollo
 
 - Se requiere un archivo `.env` en la raíz del proyecto con las siguientes variables:
   - `BOT_TOKEN`: Token del bot de Telegram.
-  - `OPENAI_API_KEY`: Clave de la API de OpenAI.
-  - `DB_PATH` (opcional, por defecto `bot.db`): Ruta al archivo de la base de datos SQLite.
-  - `DEBUG_MODE` (opcional, por defecto `false`): Si es `true`, establece el nivel de log a DEBUG.
-  - `LOG_LEVEL` (opcional, por defecto `INFO`): Nivel de logging (ej. `INFO`, `DEBUG`, `WARNING`).
-  - `ENVIRONMENT` (opcional, por defecto `development`): Entorno de ejecución.
-  - `AUTO_ADMIN_USER_IDS_CSV` (opcional): Lista de IDs de usuario de Telegram separados por coma que serán configurados automáticamente como administradores del bot.
+  - `OPENROUTER_API_KEY`: Clave para la API de OpenRouter (para LLMs de resumen).
+  - `OPENAI_API_KEY_FOR_WHISPER`: Clave de la API de OpenAI (exclusivamente para transcripciones con Whisper).
+  - `DB_PATH` (opcional, por defecto `bot.db`).
+  - `DEBUG_MODE` (opcional, por defecto `false`).
+  - `LOG_LEVEL` (opcional, por defecto `INFO`).
+  - `ENVIRONMENT` (opcional, por defecto `development`).
+  - `AUTO_ADMIN_USER_IDS_CSV` (opcional, IDs de usuario de Telegram separados por comas para ser administradores automáticamente).
 - Dependencias listadas en `environment.yml` deben estar instaladas.
-- `ffmpeg` debe estar instalado y accesible en el PATH del sistema para que funcionen las utilidades de `media_utils.py`.
+- `ffmpeg` debe estar instalado y accesible en el PATH del sistema.
 - El script principal para ejecutar el bot es `main.py`.
 
 ## 3. Restricciones Técnicas
 
 - **Límites de la API de Telegram**:
   - Tamaño máximo de mensajes de texto (gestionado con `send_long_message`).
-  - Límites de frecuencia de envío (rate limits), aunque no hay un manejo explícito más allá de la lógica de cooldowns implementada a nivel de bot.
-- **Límites de la API de OpenAI**:
-  - Límites de tokens para los modelos (ej. GPT-4o tiene un límite de 128k tokens). `OpenAIService` tiene una constante `MAX_INPUT_CHARS` para tratar de manejar esto, y `summarize_large_document` divide el texto si es necesario.
-  - Límites de frecuencia y cuotas de uso de la API.
+  - Límites de frecuencia de envío.
+- **Límites de API (OpenRouter y OpenAI directa para Whisper)**:
+  - Límites de tokens para los modelos (ej. `deepseek/deepseek-r1:free` tiene un contexto de ~160k tokens, pero los límites de salida pueden variar). Se revisará `MAX_INPUT_CHARS` en `OpenAIService` para alinearlo con el modelo DeepSeek y la estrategia de chunking.
+  - Límites de frecuencia y cuotas de uso de las respectivas APIs.
 - **Límites Implementados por el Bot (para Usuarios Gratuitos)**:
-  - El comando `/summarize` tiene cooldowns diferenciados:
-    - `COOLDOWN_TEXT_SIMPLE_SECONDS` (120s) para operaciones simples (resumen de chat, texto plano).
-    - `COOLDOWN_ADVANCED_SECONDS` (600s) para operaciones avanzadas/costosas (multimedia, documentos, URLs).
-  - Límite diario de `DAILY_LIMIT_ADVANCED_OPS` (5) para operaciones avanzadas/costosas.
-  - Estos límites son gestionados por el bot y almacenados en la base de datos SQLite.
+  - El comando `/summarize` tiene cooldowns y límites diarios para operaciones avanzadas/costosas.
 - **Procesamiento de Archivos Grandes**:
-  - `MAX_FILE_SIZE` (20MB) se define en `constants.py` para limitar el tamaño de archivos de audio/vídeo procesados localmente antes de enviarlos a OpenAI.
-  - El procesamiento de documentos grandes (`summarize_large_document`) divide el texto en chunks para evitar exceder los límites de tokens de OpenAI, usando GPT-4o-mini para chunks intermedios y GPT-4o para el resumen final.
-- **Dependencia de `ffmpeg`**: Las funcionalidades de compresión de audio y extracción de audio de vídeo dependen de que `ffmpeg` esté correctamente instalado en el entorno de ejecución.
-- **Naturaleza Asíncrona**: Toda la lógica de E/S debe ser asíncrona para no bloquear el bucle de eventos del bot.
+  - `MAX_FILE_SIZE` (20MB) para archivos procesados localmente antes de enviarlos a APIs de transcripción.
+  - La función `summarize_large_document` en `OpenAIService` dividirá el texto en chunks para evitar exceder los límites de tokens del LLM de OpenRouter.
+- **Dependencia de `ffmpeg`**: Crítica para el procesamiento de audio y video.
+- **Naturaleza Asíncrona**: Requerida para toda la E/S y operaciones de red.
 
 ## 4. Dependencias (Resumen de `environment.yml`)
 
-- `python=3.12`
-- `pip`
-- `python-telegram-bot`: Interfaz con la API de Telegram.
-- `python-dotenv`: Carga de variables de entorno.
-- `openai`: Cliente para la API de OpenAI.
-- `aiosqlite`: Acceso asíncrono a SQLite.
-- `youtube-transcript-api`: Obtención de transcripciones de YouTube.
-- `python-readability` (probablemente `readability-lxml`): Extracción de contenido de artículos web.
-- `python-docx`: Lectura de archivos DOCX.
-- `PyPDF2`: Lectura de archivos PDF.
-- `pytz`: Manejo de zonas horarias.
-- `APScheduler`: Programación de tareas.
-- (Implícitas o transitivas no listadas directamente pero usadas: `aiohttp` para descargas asíncronas de imágenes).
+- (Se asume que `environment.yml` se mantendrá actualizado con las librerías mencionadas, especialmente `openai`, `python-telegram-bot`, `aiosqlite`, etc.).
 
 ## 5. Patrones de Uso de Herramientas
 
-- **`ffmpeg`**: Se utiliza mediante `asyncio.create_subprocess_exec` para ejecutar comandos de `ffmpeg` de forma asíncrona para:
-  - Comprimir audio al formato Opus (`libopus`) con una tasa de bits baja (12k) y aplicación VoIP, optimizado para voz.
-  - Extraer audio de vídeos a formato WAV (pcm_s16le, mono, 16000 Hz), un formato común para APIs de transcripción.
-- **`OpenAIService`**:
-  - Utiliza `client.chat.completions.create` para interactuar con los modelos de lenguaje.
-  - Utiliza `client.audio.transcriptions.create` para el modelo Whisper.
-  - Maneja la lógica de prompts dinámicos según el tipo de resumen y el idioma (actualmente fijo a Español).
-  - Implementa una estrategia de "map-reduce" para documentos grandes (`summarize_large_document`), resumiendo chunks y luego resumiendo los resúmenes.
-- **`DatabaseService`**:
-  - Usa `aiosqlite` para todas las interacciones con la BD.
-  - Define el esquema de la BD, incluyendo triggers para `updated_at` y limpieza de mensajes antiguos.
-  - Proporciona métodos CRUD asíncronos y consultas específicas.
-  - Almacena y gestiona datos de uso de los usuarios para el sistema de límites del comando `/summarize`, incluyendo `last_text_simple_op_time`, `last_advanced_op_time`, `advanced_op_today_count`, y `advanced_op_count_reset_date` en la tabla `telegram_user`.
-- **`Logger`**: Configura un logger raíz y permite obtener loggers específicos por módulo, con handlers para consola y archivos rotatorios. El nivel de log y el formato son configurables.
-- **`SchedulerService`**: Configura `AsyncIOScheduler` de `APScheduler` con un `CronTrigger` para ejecutar `send_daily_summaries` a una hora fija en la zona horaria "Europe/Madrid".
+- **`ffmpeg`**: Uso asíncrono para compresión y extracción de audio.
+- **`OpenAIService` (Refactorizado)**:
+  - Gestionará dos instancias de cliente `openai.AsyncOpenAI`:
+    - Una configurada para OpenRouter (`base_url="https://openrouter.ai/api/v1"`, `api_key=config.OPENROUTER_API_KEY`) para llamadas a `chat.completions.create` usando modelos como `deepseek/deepseek-r1:free` para resúmenes.
+    - Otra configurada para la API directa de OpenAI (`api_key=config.OPENAI_API_KEY_FOR_WHISPER`) para llamadas a `audio.transcriptions.create` con el modelo Whisper-1.
+  - Los prompts del sistema se cargarán desde `bot/prompts/` (e.g., `summary_prompts.py`).
+  - La estrategia "map-reduce" para `summarize_large_document` usará el modelo de DeepSeek (o similar vía OpenRouter) para el resumen final, y potencialmente un modelo más rápido/barato de OpenRouter para los chunks intermedios si se decide optimizar aún más.
+  - La funcionalidad de análisis de imágenes ha sido eliminada.
+- **`DatabaseService`**: Sin cambios mayores previstos en su interfaz, seguirá gestionando usuarios, mensajes, estados y límites de uso.
+- **`Logger`**: Configuración estándar a través de `bot/utils/logger.py`.
+- **`SchedulerService`**: Sin cambios mayores previstos.
+- **`Config`**: Adaptada para cargar y proveer las nuevas claves de API (`OPENROUTER_API_KEY`, `OPENAI_API_KEY_FOR_WHISPER`) en lugar de una única `OPENAI_API_KEY`.
