@@ -5,46 +5,51 @@ from telegram.ext import ContextTypes
 from bot.utils.logger import logger
 from bot.utils.decorators import log_command, bot_started
 from bot.services.database_service import db_service
-from telegram.ext import ContextTypes
+from bot.utils.constants import (
+    COOLDOWN_TEXT_SIMPLE_SECONDS,
+    COOLDOWN_ADVANCED_SECONDS,
+    DAILY_LIMIT_ADVANCED_OPS
+)
 import asyncio
 
 logger = logger.get_logger(__name__)
 
-HELP_MESSAGE = (
-    "👋 **Bienvenido al Bot de Resúmenes Al-Grano** 👋\n\n"
-    "Este bot está diseñado para ayudarte a resumir contenido de manera rápida y eficiente. A continuación, se detallan todos los comandos y funcionalidades disponibles:\n\n"
-    "🔹 **Comandos Disponibles:**\n"
-    "• `/start` - Inicia el bot y configura el estado inicial en el chat.\n"
-    "• `/help` - Muestra esta guía de ayuda detallada.\n"
-    "• `/about` - Proporciona información sobre el creador y el propósito del bot.\n"
-    "• `/summarize` - Genera resúmenes de mensajes o contenido específico.\n"
-    "• `/toggle_daily_summary` - Activa o desactiva el resumen diario automático del chat.\n"
-    "• `/toggle_summary_type` - Alterna entre resúmenes largos detallados y cortos concisos.\n\n"
-    "🔹 **Cómo Usar `/summarize`:**\n"
-    "• **Resumir los últimos mensajes del chat:**\n"
-    "  Simplemente envía `/summarize` sin responder a ningún mensaje. El bot resumirá los últimos 300 mensajes del chat para que no se te escape nada importante.\n\n"
-    "• **Resumir un mensaje específico:**\n"
-    "  Responde a un mensaje con `/summarize` y el bot generará un resumen del contenido de ese mensaje. Esto incluye texto, enlaces de YouTube, documentos, audio, video, encuestas, etc.\n\n"
-    "• **Resumir un video de YouTube:**\n"
-    "  Si respondes a un mensaje que contiene un enlace de YouTube con `/summarize`, el bot extraerá y resumirá los subtítulos del video para proporcionarte una visión general del contenido.\n\n"
-    "🔹 **Tipos de Contenido que el Bot Puede Resumir:**\n"
-    "• **Mensajes de Texto:** Resumen de conversaciones recientes o mensajes específicos.\n"
-    "• **Enlaces de YouTube:** Resumen de videos mediante subtítulos disponibles.\n"
-    "• **Documentos:** Resumen de archivos como PDF, DOCX y TXT.\n"
-    "• **Archivos de Audio y Voz:** Transcripción y resumen de mensajes de voz o archivos de audio.\n"
-    "• **Videos y Notas de Video:** Extracción de audio, transcripción y resumen de contenido de video.\n"
-    "• **Encuestas:** Resumen de preguntas y opciones de encuestas enviadas en el chat.\n\n"
-    "🔹 **Características Adicionales:**\n"
-    "• **Almacenamiento de Mensajes:** Todos los mensajes enviados en el chat se almacenan en la base de datos para facilitar la generación de resúmenes precisos.\n"
-    "• **Administradores:** Comandos especiales y permisos adicionales para usuarios administradores.\n\n"
-    "🔹 **Notas Importantes:**\n"
-    "• **Seguridad y Privacidad:** El bot maneja información sensible. Asegúrate de que solo usuarios autorizados tengan acceso a comandos privilegiados.\n"
-    "• **Limitaciones:** El tamaño máximo de archivos para procesamiento es de 20 MB. Asegúrate de que los archivos que envías cumplan con este límite.\n\n"
-    "🔹 **Soporte y Donaciones:**\n"
-    "Este bot ha sido creado por [@Arkantos2374](https://t.me/Arkantos2374) con mucho esfuerzo. Si deseas apoyar el desarrollo y mantenimiento del bot, puedes realizar una donación vía [PayPal](https://paypal.me/mariusmihailion). ¡Gracias por tu apoyo!\n\n"
-    "🚀 **¡Vamos a darle caña a esto y a resumir al grano!** 🚀"
-)
+cooldown_simple_minutes = COOLDOWN_TEXT_SIMPLE_SECONDS // 60
+cooldown_advanced_minutes = COOLDOWN_ADVANCED_SECONDS // 60
 
+HELP_MESSAGE = (
+    "👋 **¡Eh, tú! Bienvenido al Bot de Resúmenes Al-Grano, el puto amo resumiendo mierdas.** 👋\n\n"
+    "Este bot está aquí para que dejes de perder el tiempo leyendo tochos. Yo te lo resumo y te vas de cañas. Aquí te va el rollo, para que te enteres:\n\n"
+    "🔹 **Comandos para que no te ahogues en mierda:**\n"
+    "• `/start` - Despierta a esta bestia y dile que curre en este chat. ¡YA!\n"
+    "• `/help` - Si eres tan corto que necesitas ayuda, aquí tienes esta parrafada. ¡Léetela!\n"
+    "• `/summarize` - El puto amo de los comandos. Te resume lo que sea. ¡Pídele y calla!\n"
+    "• `/toggle_daily_summary` (Solo para JEFES) - Activa/desactiva el resumen diario. Si eres un mindundi, ni lo intentes.\n"
+    "• `/toggle_summary_type` (También para JEFES) - Elige si quieres el resumen mascadito (corto) o el tocho (largo). Tú mandas, si eres admin.\n\n"
+    "🔹 **Cómo usar `/summarize` sin parecer un paquete:**\n"
+    "• **Resumir el chat como un vago (Operación Simple):**\n"
+    "  Tira un `/summarize` y déjalo que se curre los últimos mensajes del chat (hasta 300). ¡Menos leer para ti, fenómeno!\n\n"
+    "• **Resumir UN puto mensaje (Simple o Avanzado, según le dé):**\n"
+    "  Responde a un mensaje con `/summarize`. No es física cuántica, ¿verdad? El bot se encarga, tú solo espera.\n\n"
+    "🔹 **Qué mierdas resume este cacharro (y ojo con los límites, que no soy tu esclavo):**\n\n"
+    "  **Operaciones SIMPLES (para gente con prisa y poco presupuesto):**\n"
+    "  ⏱️ **¡Quieto parao 2 MINUTOS!** No me seas ansias entre usos.\n"
+    "  • **Mensajes de Texto:** Te resumo la cháchara del chat o ese mensaje de texto que te da pereza leer.\n"
+    "  • **Enlaces de YouTube:** Me chivo los subtítulos (si los hay, claro) y te planto un resumen. ¡De nada!\n"
+    "  • **Artículos Web:** Pásame el link y te saco el jugo, para que no te tragues el tostón entero.\n\n"
+    "  **Operaciones AVANZADAS (estas me cuestan la pasta y el curro, así que ojito):**\n"
+    "  ⏱️ **¡A esperar 10 MINUTAZOS, figura!** Que esto no es gratis.\n"
+    "  📈 **SOLO 5 de estas al día, ¿eh?** Si no eres admin, claro. Los jefes, barra libre.\n"
+    "  • **Archivos de Audio y Mensajes de Voz:** Los transcribo y te los resumo. Me entero de todo, ¡cabrón!\n"
+    "  • **Videos y Notas de Video (archivos):** Les saco el audio, lo transcribo y te lo resumo. ¡Un currazo que te cagas!\n"
+    "  • **Documentos (PDF, DOCX, TXT):** Les echo un ojo, saco el texto y te lo resumo. Si es un ladrillo, tardaré un poco, pero no me rajo.\n\n"
+    "🔹 **Avisos para navegantes (¡más te vale leer esto!):**\n"
+    "• **Si eres un tieso (usuario gratuito):** Para que no me revientes el chiringuito, te pongo límites. Los cooldowns son para que respires entre comando y comando. Y las operaciones avanzadas (transcribir audios/vídeos, documentos tochos... esas que me hacen sudar tinta y gastar billetes) tienen un límite diario. Si eres admin, te puedes pasar el día dándome por culo, me da igual.\n"
+    "• **Archivos, el tamaño SÍ importa:** Máximo 20MB. Si me pasas algo más gordo, te lo comes con patatas. No soy un disco duro con patas.\n\n"
+    "🔹 **Si te mola cómo curro y quieres que siga dando guerra (o invitarme a una birra):**\n"
+    "Este tinglado lo montó [@Arkantos2374](https://t.me/Arkantos2374), que se ha dejado las pestañas en ello. Si quieres que no me muera de hambre y que el bot siga rulando, suéltale algo por [PayPal](https://paypal.me/mariusmihailion). ¡Se agradece, fiera!\n\n"
+    "🚀 **¡Venga, a darle al `/summarize` y déjate de hostias!** 🚀"
+)
 
 @log_command()
 @bot_started()
@@ -54,6 +59,6 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         logger.error(f"Error en help_handler: {e}")
         await update.message.reply_text(
-            "Hubo un error al procesar tu solicitud de ayuda."
+            "¡Hostia puta! Algo ha petado al intentar mostrarte la ayuda. Inténtalo otra vez, anda."
         )
         raise e
