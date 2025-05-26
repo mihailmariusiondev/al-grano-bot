@@ -1,7 +1,6 @@
 import os
 from typing import Optional, List, Set
 
-
 class Config:
     _instance = None
 
@@ -15,30 +14,39 @@ class Config:
         if not self.initialized:
             # Bot settings
             self.BOT_TOKEN: Optional[str] = None
-            self.OPENAI_API_KEY: Optional[str] = None
+            self.OPENAI_API_KEY: Optional[str] = None # For direct OpenAI calls (e.g., Whisper)
+            self.OPENROUTER_API_KEY: Optional[str] = None # For OpenRouter LLM calls
+            self.OPENROUTER_SITE_URL: str = "https://github.com/mihailmariusiondev/al-grano-bot" # Default or example URL
+            self.OPENROUTER_SITE_NAME: str = "Al-Grano Bot" # Default or example name
+            self.OPENROUTER_PRIMARY_MODEL: str = "deepseek/deepseek-r1:free"
+            self.OPENROUTER_FALLBACK_MODEL: str = "deepseek/deepseek-r1" # Example, confirm actual identifier if different
 
             # Database settings
             self.DB_PATH: str = "bot.db"
-
             # Other settings
             self.DEBUG_MODE: bool = False
             self.ENVIRONMENT: str = "development"
-
             # Auto Admin IDs
             self.AUTO_ADMIN_USER_IDS: Set[int] = set()
-
             self.initialized = True
 
     def load_from_env(self):
         """Load configuration from environment variables"""
         self.BOT_TOKEN = os.getenv("BOT_TOKEN")
         self.OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-        self.DB_PATH = os.getenv("DB_PATH", "bot.db")
+        self.OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+        self.OPENROUTER_SITE_URL = os.getenv("OPENROUTER_SITE_URL", self.OPENROUTER_SITE_URL)
+        self.OPENROUTER_SITE_NAME = os.getenv("OPENROUTER_SITE_NAME", self.OPENROUTER_SITE_NAME)
 
+        # Load model identifiers from env, with defaults
+        self.OPENROUTER_PRIMARY_MODEL = os.getenv("OPENROUTER_PRIMARY_MODEL", "deepseek/deepseek-r1:free")
+        self.OPENROUTER_FALLBACK_MODEL = os.getenv("OPENROUTER_FALLBACK_MODEL", "deepseek/deepseek-r1")
+
+
+        self.DB_PATH = os.getenv("DB_PATH", "bot.db")
         self.DEBUG_MODE = os.getenv("DEBUG_MODE", "false").lower() == "true"
         self.ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
 
-        # Load Auto Admin IDs from environment variable
         auto_admin_ids_str = os.getenv("AUTO_ADMIN_USER_IDS_CSV")
         if auto_admin_ids_str:
             try:
@@ -49,11 +57,6 @@ class Config:
                 print(f"WARNING: Invalid format for AUTO_ADMIN_USER_IDS_CSV: '{auto_admin_ids_str}'. Expected comma-separated integers.")
                 self.AUTO_ADMIN_USER_IDS = set()
         else:
-            # Optional: Add default admin ID if no environment variable is set
-            # Uncomment and replace with your actual ID if desired
-            # NOTE: This is the ID of the bot owner
-            self.AUTO_ADMIN_USER_IDS.add(6025856)
-            pass
-
+            self.AUTO_ADMIN_USER_IDS.add(6025856) # Default admin ID
 
 config = Config()  # Single instance
