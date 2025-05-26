@@ -1,3 +1,4 @@
+# bot/commands/summarize_command.py
 from telegram.ext import CallbackContext
 from telegram import Update
 from bot.utils.decorators import (
@@ -19,13 +20,12 @@ from bot.handlers.video_handler import video_handler
 from bot.handlers.audio_handler import audio_handler
 from bot.handlers.article_handler import article_handler
 from bot.handlers.document_handler import document_handler
-from bot.handlers.photo_handler import photo_handler
 import asyncio
 from datetime import datetime,  date
 
 ERROR_MESSAGES = {
     "NOT_ENOUGH_MESSAGES": "No hay suficientes mensajes para resumir. O me das 5 mensajes o te mando a la mierda",
-    "ERROR_SUMMARIZING": "Error al resumir los mensajes. Ya la hemos liao... ",
+    "ERROR_SUMMARIZING": "Error al resumir los mensajes. Ya la hemos liao...",
     "ERROR_INVALID_YOUTUBE_URL": "URL de YouTube inválida. Eres tonto o qué?..",
     "ERROR_NOT_REPLYING_TO_MESSAGE": "No estás respondiendo a ningún mensaje. No me toques los co",
     "ERROR_TRANSCRIPT_DISABLED": "Transcripción deshabilitada para este vídeo. No me presiones tronco",
@@ -36,8 +36,6 @@ ERROR_MESSAGES = {
     "ERROR_PROCESSING_VIDEO_NOTE": "Error: No he podido procesar el video circular. Dale otra vez, figura.",
     "ERROR_PROCESSING_DOCUMENT": "Error: Este documento me ha dejado pillado. Prueba con otro formato, crack.",
     "ERROR_UNSUPPORTED_DOCUMENT": "Error: Este tipo de documento no lo manejo todavía, máquina.",
-    "ERROR_NO_CAPTION": "Error: La foto no tiene texto que resumir, figura.",
-    "ERROR_PROCESSING_POLL": "Error: No he podido procesar la encuesta. Prueba otra vez, crack.",
 }
 
 PROGRESS_MESSAGES = {
@@ -53,7 +51,6 @@ PROGRESS_MESSAGES = {
 
 logger = logger.get_logger(__name__)
 
-
 async def update_progress(message, text: str, delay: float = 0.5) -> None:
     """Update progress message with new status"""
     try:
@@ -61,7 +58,6 @@ async def update_progress(message, text: str, delay: float = 0.5) -> None:
         await message.edit_text(f"{text}")
     except Exception as e:
         logger.error(f"Error updating progress: {e}")
-
 
 @log_command()
 @bot_started()
@@ -72,7 +68,6 @@ async def summarize_command(update: Update, context: CallbackContext):
     user_tg = update.effective_user
     chat_id = update.effective_chat.id
     wait_message = None
-
     try:
         user_db = await db_service.get_or_create_user(
             user_id=user_tg.id,
@@ -89,19 +84,18 @@ async def summarize_command(update: Update, context: CallbackContext):
         else:
             reply_msg = update.message.reply_to_message
             message_type_raw = get_message_type(reply_msg)
-
             if message_type_raw == "text":
                 text_content = reply_msg.text or ""
                 if YOUTUBE_REGEX.search(text_content) or ARTICLE_URL_REGEX.search(text_content):
                     operation_type = OPERATION_TYPE_ADVANCED
                 else:
                     operation_type = OPERATION_TYPE_TEXT_SIMPLE
-            elif message_type_raw in ["voice", "audio", "video", "video_note", "document", "photo"]:
+            elif message_type_raw in ["voice", "audio", "video", "video_note", "document"]:
                 operation_type = OPERATION_TYPE_ADVANCED
-            else:  # E.g. poll, unknown
-                operation_type = OPERATION_TYPE_TEXT_SIMPLE  # Treat as simple for now
+            else:
+                operation_type = OPERATION_TYPE_TEXT_SIMPLE # Treat as simple
 
-        if not operation_type:  # Fallback, should not happen if logic above is complete
+        if not operation_type:
             await update.message.reply_text("No se pudo determinar el tipo de operación de resumen.")
             return
 
@@ -111,13 +105,11 @@ async def summarize_command(update: Update, context: CallbackContext):
             if operation_type == OPERATION_TYPE_ADVANCED:
                 advanced_op_reset_date_str = user_db.get("advanced_op_count_reset_date")
                 advanced_op_reset_date = None
-
                 if advanced_op_reset_date_str:
                     try:
                         advanced_op_reset_date = date.fromisoformat(advanced_op_reset_date_str)
                     except ValueError:
                         logger.error(f"Invalid date format for advanced_op_count_reset_date: {advanced_op_reset_date_str} for user {user_tg.id}")
-
                 if advanced_op_reset_date != current_date_val:
                     await db_service.update_user_fields(
                         user_tg.id,
@@ -126,14 +118,13 @@ async def summarize_command(update: Update, context: CallbackContext):
                             "advanced_op_count_reset_date": current_date_val.isoformat(),
                         },
                     )
-                    user_db["advanced_op_today_count"] = 0  # Update local copy
+                    user_db["advanced_op_today_count"] = 0
                     user_db["advanced_op_count_reset_date"] = current_date_val.isoformat()
                     logger.info(f"Reset daily advanced op count for user {user_tg.id}")
 
             # Cooldown Check
             cooldown_seconds = 0
             last_op_time_str = None
-
             if operation_type == OPERATION_TYPE_TEXT_SIMPLE:
                 cooldown_seconds = COOLDOWN_TEXT_SIMPLE_SECONDS
                 last_op_time_str = user_db.get("last_text_simple_op_time")
@@ -144,7 +135,6 @@ async def summarize_command(update: Update, context: CallbackContext):
             if last_op_time_str:
                 last_op_time_dt = datetime.fromisoformat(last_op_time_str)
                 elapsed_seconds = (current_time_dt - last_op_time_dt).total_seconds()
-
                 if elapsed_seconds < cooldown_seconds:
                     remaining_cooldown = int(cooldown_seconds - elapsed_seconds)
                     await update.message.reply_text(
@@ -161,54 +151,43 @@ async def summarize_command(update: Update, context: CallbackContext):
                     )
                     return
 
-        # Initial waiting message (now that limits passed or user is admin)
         wait_message = await update.message.reply_text("⏳ Procesando tu solicitud...")
 
         # 3. Content Processing
-        # Case 1: No reply - summarize recent messages (classified as TEXT_SIMPLE)
         if not update.message.reply_to_message:
             await update_progress(wait_message, PROGRESS_MESSAGES["FETCHING_MESSAGES"])
-
             recent_messages = await db_service.get_recent_messages(
                 chat_id, MAX_RECENT_MESSAGES
             )
             if len(recent_messages) < 5:
                 await wait_message.edit_text(ERROR_MESSAGES["NOT_ENOUGH_MESSAGES"])
                 return
-
             await update_progress(wait_message, PROGRESS_MESSAGES["FORMATTING"])
             formatted_messages = format_recent_messages(recent_messages)
-
             chat_state_db = await db_service.get_chat_state(chat_id)
             summary_style = (
                 "chat_long"
                 if chat_state_db.get("summary_type", "long") == "long"
                 else "chat_short"
             )
-
             await update_progress(wait_message, PROGRESS_MESSAGES["SUMMARIZING"])
             summary = await openai_service.get_summary(
                 content=formatted_messages,
-                summary_type=summary_style,
+                summary_type=summary_style, # This is 'chat_long' or 'chat_short', not from SUMMARY_PROMPTS directly
                 language="Spanish",
             )
-
             await update_progress(wait_message, PROGRESS_MESSAGES["FINALIZING"])
             await send_long_message(update, summary)
-
-        # Case 2: Reply to message
         else:
             reply_msg = update.message.reply_to_message
             message_type_for_handler = get_message_type(reply_msg)
             content_for_summary = None
             summary_type_for_openai = None
-
             try:
                 match message_type_for_handler:
                     case "text":
                         await update_progress(wait_message, PROGRESS_MESSAGES["ANALYZING"])
                         text = reply_msg.text or ""
-
                         if YOUTUBE_REGEX.search(text):
                             await update_progress(wait_message, PROGRESS_MESSAGES["DOWNLOADING"])
                             content_for_summary = await youtube_handler(update, context, text)
@@ -220,52 +199,35 @@ async def summarize_command(update: Update, context: CallbackContext):
                         else:
                             content_for_summary = text
                             summary_type_for_openai = "quoted_message"
-
                     case "voice" | "audio":
                         await update_progress(wait_message, PROGRESS_MESSAGES["DOWNLOADING"])
                         await update_progress(wait_message, PROGRESS_MESSAGES["TRANSCRIBING"])
                         content_for_summary = await audio_handler(reply_msg, context)
                         summary_type_for_openai = "voice_message" if message_type_for_handler == "voice" else "audio_file"
-
                     case "video" | "video_note":
                         await update_progress(wait_message, PROGRESS_MESSAGES["DOWNLOADING"])
                         await update_progress(wait_message, PROGRESS_MESSAGES["PROCESSING"])
                         content_for_summary = await video_handler(reply_msg, context)
                         summary_type_for_openai = "video_note" if message_type_for_handler == "video_note" else "telegram_video"
-
                     case "document":
                         await update_progress(wait_message, PROGRESS_MESSAGES["ANALYZING"])
                         content_for_summary = await document_handler(reply_msg, context)
                         if not content_for_summary:
                             raise ValueError("No se pudo extraer contenido del documento")
                         summary_type_for_openai = "document"
-
-                        # For documents, summarization is handled differently (large doc)
                         await update_progress(wait_message, PROGRESS_MESSAGES["SUMMARIZING"])
                         summary = await openai_service.summarize_large_document(content_for_summary)
                         await update_progress(wait_message, PROGRESS_MESSAGES["FINALIZING"])
                         await send_long_message(update, summary)
                         content_for_summary = None  # Mark as processed
-
-                    case "photo":
-                        await update_progress(wait_message, PROGRESS_MESSAGES["ANALYZING"])
-                        content_for_summary = await photo_handler(reply_msg, context)
-                        summary_type_for_openai = "photo"
-
-                    case "poll":
-                        await update_progress(wait_message, PROGRESS_MESSAGES["PROCESSING"])
-                        options = [opt.text for opt in reply_msg.poll.options]
-                        content_for_summary = f"Encuesta: {reply_msg.poll.question}\nOpciones: {', '.join(options)}"
-                        summary_type_for_openai = "quoted_message"
-
                     case _:
                         await wait_message.edit_text(
-                            f"No puedo resumir mensajes de tipo: {message_type_for_handler}"
+                            "Este tipo de mensaje no lo puedo resumir crack. Intenta con mensajes de texto, enlaces a YouTube o artículos web, mensajes de voz, archivos de audio, vídeos o documentos (PDF, DOCX, TXT)."
                         )
                         return
 
-                if content_for_summary and summary_type_for_openai:  # Check if content needs standard summarization
-                    if not content_for_summary.strip():  # Handle cases where handlers might return empty strings
+                if content_for_summary and summary_type_for_openai:
+                    if not content_for_summary.strip():
                         await wait_message.edit_text(
                             ERROR_MESSAGES.get(
                                 f"ERROR_CANNOT_SUMMARIZE_{message_type_for_handler.upper()}",
@@ -273,15 +235,13 @@ async def summarize_command(update: Update, context: CallbackContext):
                             )
                         )
                         return
-
                     await update_progress(wait_message, PROGRESS_MESSAGES["SUMMARIZING"])
                     summary = await openai_service.get_summary(content_for_summary, summary_type_for_openai)
                     await update_progress(wait_message, PROGRESS_MESSAGES["FINALIZING"])
                     await send_long_message(update, summary)
-
-                elif summary_type_for_openai == "document" and not content_for_summary:  # Document was already handled
+                elif summary_type_for_openai == "document" and not content_for_summary:
                     pass
-                elif not content_for_summary and summary_type_for_openai != "document":  # Handler returned None or empty for non-document
+                elif not content_for_summary and summary_type_for_openai != "document":
                     await wait_message.edit_text(
                         ERROR_MESSAGES.get(
                             f"ERROR_CANNOT_SUMMARIZE_{message_type_for_handler.upper()}",
@@ -289,7 +249,6 @@ async def summarize_command(update: Update, context: CallbackContext):
                         )
                     )
                     return
-
             except Exception as e:
                 logger.error(f"Error procesando mensaje: {str(e)}", exc_info=True)
                 if wait_message:
@@ -301,25 +260,20 @@ async def summarize_command(update: Update, context: CallbackContext):
         # 4. Update Usage Data (if not admin)
         if not is_admin_user:
             fields_to_update = {}
-
             if operation_type == OPERATION_TYPE_TEXT_SIMPLE:
                 fields_to_update["last_text_simple_op_time"] = current_time_dt.isoformat()
             elif operation_type == OPERATION_TYPE_ADVANCED:
                 fields_to_update["last_advanced_op_time"] = current_time_dt.isoformat()
                 fields_to_update["advanced_op_today_count"] = user_db.get("advanced_op_today_count", 0) + 1
-                # advanced_op_count_reset_date was already updated if necessary
-
             if fields_to_update:
                 await db_service.update_user_fields(user_tg.id, fields_to_update)
                 logger.info(f"Updated usage data for user {user_tg.id}, operation: {operation_type}")
 
-        # Delete the "⏳ Procesando tu solicitud..." message if it exists and no error occurred
         if wait_message:
             try:
                 await wait_message.delete()
             except Exception as e_del:
                 logger.warning(f"Could not delete wait_message: {e_del}")
-
     except Exception as e:
         logger.error(f"Error in summarize_command: {e}", exc_info=True)
         if wait_message:

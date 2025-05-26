@@ -1,14 +1,11 @@
 import openai
 from typing import List, Optional, Dict, Literal
 import asyncio
-
 from bot.utils.text_utils import chunk_text
 from bot.utils.logger import logger
 
-
 class OpenAIService:
     _instance = None
-
     # Actualizar constantes según la documentación
     GPT4O_MAX_TOKENS = 128000  # Límite real de tokens de GPT-4o
     CHARS_PER_TOKEN = 4  # Aproximación de caracteres por token
@@ -23,56 +20,42 @@ class OpenAIService:
         return cls._instance
 
     def initialize(self, api_key: str):
-        """Initialize the OpenAI service with API key"""
         if not self.initialized:
             if not api_key:
                 raise ValueError("OpenAI API key is required")
             self.client = openai.AsyncOpenAI(api_key=api_key)
             self.logger = logger.get_logger("openai_service")
             self.initialized = True
-
-            # System prompts for different summary types
             self.SUMMARY_PROMPTS = {
                 "chat_long": lambda lang, _: f"""You are an assistant helping friends catch up in a busy chat group. Your goal is to create a HIGHLY DETAILED and COMPREHENSIVE summary of the conversation.
-
               Follow these guidelines for an exhaustive summary:
-
               1. Structure:
                 - Begin with a high-level overview of the main topics discussed
                 - Break down the conversation chronologically
                 - Group related messages and topics together
                 - Highlight important decisions or conclusions reached
-
               2. Content Detail Level:
                 - Include ALL significant points and details from the conversation
                 - Preserve context and relationships between messages
                 - Capture nuanced discussions and different viewpoints
                 - Don't omit details for the sake of brevity
-
               3. Format:
                 📝 RESUMEN DETALLADO DE LA CONVERSACIÓN:
-
                 📌 TEMAS PRINCIPALES:
                 [Lista detallada de todos los temas discutidos]
-
                 🕒 DESARROLLO CRONOLÓGICO:
                 [Desglose detallado de la conversación, preservando el orden temporal]
-
                 💬 DISCUSIONES IMPORTANTES:
                 [Análisis detallado de las discusiones principales, incluyendo diferentes puntos de vista]
-
                 ✅ DECISIONES Y CONCLUSIONES:
                 [Lista de todas las decisiones tomadas y conclusiones alcanzadas]
-
                 🔍 DETALLES ADICIONALES:
                 [Cualquier información relevante que no encaje en las categorías anteriores]
-
               4. Special Considerations:
                 - Include relevant quotes when they add value
                 - Note any action items or pending tasks
                 - Highlight any unresolved discussions
                 - Mention any important links or resources shared
-
               - (IMPORTANT) NEVER reference message IDs (e.g., #360)
               - (VERY IMPORTANT) Should be in {lang}
               - Do not worry about length - the summary can be as long as needed to capture all important details""",
@@ -198,12 +181,6 @@ class OpenAIService:
                    💡 CONCLUSIONES:
                    [main conclusions]"
                 - (VERY IMPORTANT) Should be in {lang}""",
-                "poll": lambda lang, _: f"""You are a poll summarizer. Summarize the poll question and options clearly.
-                Format:
-                📊 RESUMEN DE ENCUESTA:
-                ❓ Pregunta: [poll question]
-                📍 Opciones: [formatted options]
-                - (VERY IMPORTANT) Should be in {lang}""",
                 "document": lambda lang, _: f"""You are an expert document analyzer. Your task is to:
                     1. Analyze the content thoroughly
                     2. Provide clear and concise summaries
@@ -222,28 +199,6 @@ class OpenAIService:
                        "🎥 RESUMEN DE VIDEO CIRCULAR:
                        [concise summary of the video note content]"
                     - (VERY IMPORTANT) Should be in {lang}""",
-                "photo": lambda lang, _: f"""You are an expert image analyzer. Your task is to:
-                    1. Provide a detailed description of the image content
-                    2. Focus on observable elements and maintain objectivity
-                    3. Structure your analysis as follows:
-                       - General overview
-                       - Main subjects/elements
-                       - Notable details (colors, lighting, composition)
-                       - Context or setting
-                       - Mood/atmosphere (if relevant)
-                    4. Format:
-                       "🖼️ ANÁLISIS DE IMAGEN:
-                       📍 DESCRIPCIÓN GENERAL:
-                       [general overview]
-                       👥 ELEMENTOS PRINCIPALES:
-                       [main elements]
-                       ✨ DETALLES DESTACADOS:
-                       [notable details]
-                       📝 CONTEXTO:
-                       [setting/context]
-                       🎭 AMBIENTE:
-                       [mood/atmosphere]"
-                    5. (VERY IMPORTANT) Response should be in {lang}""",
             }
 
     async def chat_completion(
@@ -288,29 +243,38 @@ class OpenAIService:
         self,
         content: str,
         summary_type: Literal[
-            "chat",
+            "chat_long", # Added specific chat types here
+            "chat_short",# Added specific chat types here
             "youtube",
             "telegram_video",
             "voice_message",
             "audio_file",
             "quoted_message",
             "web_article",
-            "poll",
             "document",
-            "photo",
+            "video_note" # Ensure video_note is present
         ],
         language: str = "Spanish",
         model: str = "gpt-4o",
     ) -> str:
         """Generate a summary using the specified model"""
         try:
+            # Ensure summary_type is valid after removal
+            if summary_type not in self.SUMMARY_PROMPTS:
+                self.logger.error(f"Invalid summary_type: {summary_type}")
+                # Fallback or raise error. For now, let's assume valid types are passed
+                # For 'chat', it's handled in summarize_command to be 'chat_long' or 'chat_short'
+                # So we need to ensure those are in SUMMARY_PROMPTS or map them appropriately.
+                # The original code had 'chat' which was then mapped to 'chat_long'/'chat_short'
+                # in summarize_command and daily_summary_service. Here, we assume the specific type is passed.
+                raise ValueError(f"Unsupported summary type: {summary_type}")
+
             prompt = self.SUMMARY_PROMPTS[summary_type](language, content)
             messages = [
                 {"role": "system", "content": prompt},
                 {"role": "user", "content": content},
             ]
             return await self.chat_completion(messages, model=model)
-
         except Exception as e:
             self.logger.error(f"Summary generation failed: {e}", exc_info=True)
             raise
@@ -324,8 +288,6 @@ class OpenAIService:
             self.logger.info(
                 f"Iniciando procesamiento de documento de {text_length} caracteres"
             )
-
-            # Si el texto es más corto que el límite máximo, procesarlo directamente con GPT-4o
             if len(text) < self.MAX_INPUT_CHARS:
                 self.logger.info(
                     f"Documento dentro del límite ({text_length}/{self.MAX_INPUT_CHARS}). "
@@ -337,13 +299,9 @@ class OpenAIService:
                     language=language,
                     model="gpt-4o",
                 )
-
-            # Para documentos más grandes, dividir en chunks
             self.logger.info("Documento excede el límite. Dividiendo en chunks...")
             chunks = chunk_text(text, chunk_size=int(self.MAX_INPUT_CHARS))
             self.logger.info(f"Documento dividido en {len(chunks)} chunks")
-
-            # Procesar chunks en paralelo usando GPT-4o-mini para mayor eficiencia
             self.logger.info(
                 "Iniciando procesamiento paralelo de chunks con GPT-4o-mini"
             )
@@ -356,40 +314,31 @@ class OpenAIService:
                 )
                 for chunk in chunks
             ]
-
             self.logger.info("Esperando resultados de todos los chunks...")
             chunk_summaries = await asyncio.gather(*tasks)
             self.logger.info(f"Procesados {len(chunk_summaries)} chunks exitosamente")
-
-            # Si solo hay un chunk después del resumen, retornarlo directamente
             if len(chunk_summaries) == 1:
                 self.logger.info(
                     "Solo un chunk procesado, retornando resumen directamente"
                 )
                 return chunk_summaries[0]
-
-            # Para el resumen final usar GPT-4o para mejor calidad
             self.logger.info("Generando resumen final con GPT-4o")
             combined_summaries = "\n\n".join(chunk_summaries)
             self.logger.info(
                 f"Longitud total de resúmenes combinados: {len(combined_summaries)} caracteres"
             )
-
             final_summary = await self.get_summary(
                 content=combined_summaries,
                 summary_type="document",
                 language=language,
                 model="gpt-4o",
             )
-
             self.logger.info(
                 f"Resumen final generado. Longitud: {len(final_summary)} caracteres"
             )
             return final_summary
-
         except Exception as e:
             self.logger.error(f"Error procesando documento grande: {e}", exc_info=True)
             raise
 
-
-openai_service = OpenAIService()  # Single instance
+openai_service = OpenAIService()
