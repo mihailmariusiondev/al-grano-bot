@@ -11,14 +11,7 @@
   "ignore": {
     "useGitignore": true,
     "useDefaultPatterns": true,
-    "customPatterns": [
-      ".gitignore",
-      "repomix.config.json",
-      ".cursorrules",
-      "prompts",
-      "README.md",
-      "LICENSE"
-    ]
+    "customPatterns": [".gitignore", "repomix.config.json", ".cursorrules", "prompts", "LICENSE"]
   },
   "security": {
     "enableSecurityCheck": true
