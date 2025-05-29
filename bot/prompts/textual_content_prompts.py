@@ -31,15 +31,16 @@ def web_article_template(lang: str, _: str = None) -> str:
                    - Highlight main arguments
                 3. Format:
                    "📰 RESUMEN DE ARTÍCULO:
-                   📍 TÍTULO:
+                   *📍 TÍTULO:*
                    [article title]
-                   📝 TEMA PRINCIPAL:
+                   *📝 TEMA PRINCIPAL:*
                    [main topic]
-                   📊 PUNTOS CLAVE:
-                   [key points in bullet format]
-                   💡 CONCLUSIONES:
+                   *📊 PUNTOS CLAVE:*
+                   [key points in bullet format. Use MarkdownV2 for bullet points: `- Point 1`]
+                   *💡 CONCLUSIONES:*
                    [main conclusions]"
-                - (VERY IMPORTANT) Should be in {lang}"""
+                - (VERY IMPORTANT) Should be in {lang}
+                - Please use MarkdownV2 for formatting elements like bold (*text*), italics (_text_), and bulleted lists (- item)."""
 
 def document_template(lang: str, _: str = None) -> str:
     return f"""You are an expert document analyzer. Your task is to:

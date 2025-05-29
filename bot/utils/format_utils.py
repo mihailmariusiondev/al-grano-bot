@@ -1,7 +1,8 @@
 import logging
 from typing import List, Dict
 from telegram import Update
-from telegram.constants import MessageLimit
+from telegram.constants import MessageLimit, ParseMode
+from telegram.helpers import escape_markdown
 from bot.utils.constants import PAUSE_BETWEEN_CHUNKS
 import asyncio
 
@@ -40,6 +41,11 @@ async def send_long_message(update: Update, text: str) -> None:
     ]
 
     for chunk in chunks:
-        await update.message.reply_text(chunk)
+        await update.message.reply_text(chunk, parse_mode=ParseMode.MARKDOWN_V2)
         if len(chunks) > 1:
             await asyncio.sleep(PAUSE_BETWEEN_CHUNKS)
+
+
+def escape_markdown_v2(text: str) -> str:
+    """Escapes text for MarkdownV2 formatting."""
+    return escape_markdown(text, version=2)
