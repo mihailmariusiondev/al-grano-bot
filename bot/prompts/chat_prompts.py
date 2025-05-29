@@ -16,17 +16,17 @@ def chat_long_template(lang: str, _: str = None) -> str:
                 - Capture nuanced discussions and different viewpoints
                 - Don't omit details for the sake of brevity
               3. Format:
-                📝 RESUMEN DETALLADO DE LA CONVERSACIÓN:
-                📌 TEMAS PRINCIPALES:
-                [Lista detallada de todos los temas discutidos]
-                🕒 DESARROLLO CRONOLÓGICO:
-                [Desglose detallado de la conversación, preservando el orden temporal]
-                💬 DISCUSIONES IMPORTANTES:
-                [Análisis detallado de las discusiones principales, incluyendo diferentes puntos de vista]
-                ✅ DECISIONES Y CONCLUSIONES:
-                [Lista de todas las decisiones tomadas y conclusiones alcanzadas]
-                🔍 DETALLES ADICIONALES:
-                [Cualquier información relevante que no encaje en las categorías anteriores]
+                *📝 RESUMEN DETALLADO DE LA CONVERSACIÓN:*
+                *📌 TEMAS PRINCIPALES:*
+                [Lista detallada de todos los temas discutidos. Use MarkdownV2 bullet points: `- Tema 1`]
+                *🕒 DESARROLLO CRONOLÓGICO:*
+                [Desglose detallado de la conversación, preservando el orden temporal. Use MarkdownV2 bullet points or numbered lists where appropriate.]
+                *💬 DISCUSIONES IMPORTANTES:*
+                [Análisis detallado de las discusiones principales, incluyendo diferentes puntos de vista. Use MarkdownV2 bullet points.]
+                *✅ DECISIONES Y CONCLUSIONES:*
+                [Lista de todas las decisiones tomadas y conclusiones alcanzadas. Use MarkdownV2 bullet points: `- Decisión 1`]
+                *🔍 DETALLES ADICIONALES:*
+                [Cualquier información relevante que no encaje en las categorías anteriores. Use MarkdownV2 bullet points if listing multiple items.]
               4. Special Considerations:
                 - Include relevant quotes when they add value
                 - Note any action items or pending tasks
@@ -34,7 +34,8 @@ def chat_long_template(lang: str, _: str = None) -> str:
                 - Mention any important links or resources shared
               - (IMPORTANT) NEVER reference message IDs (e.g., #360)
               - (VERY IMPORTANT) Should be in {lang}
-              - Do not worry about length - the summary can be as long as needed to capture all important details"""
+              - Do not worry about length - the summary can be as long as needed to capture all important details
+              - Format your response using MarkdownV2. Use features like *bold* for emphasis, _italics_ for nuances, and bullet points (`- item`) for lists."""
 
 def chat_short_template(lang: str, _: str = None) -> str:
     return f"""You are an assistant creating concise chat summaries. Follow these rules:

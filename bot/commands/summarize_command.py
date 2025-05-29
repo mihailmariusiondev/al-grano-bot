@@ -1,11 +1,12 @@
 # bot/commands/summarize_command.py
 from telegram.ext import CallbackContext
 from telegram import Update
+from telegram.constants import ParseMode
 from bot.utils.decorators import (
     log_command,
     bot_started,
 )
-from bot.utils.format_utils import format_recent_messages, send_long_message
+from bot.utils.format_utils import format_recent_messages, send_long_message, escape_markdown_v2
 from bot.utils.logger import logger
 from bot.utils.get_message_type import get_message_type
 from bot.utils.constants import (
@@ -55,7 +56,7 @@ async def update_progress(message, text: str, delay: float = 0.5) -> None:
     """Update progress message with new status"""
     try:
         await asyncio.sleep(delay)  # Add small delay for better UX
-        await message.edit_text(f"{text}")
+        await message.edit_text(f"{text}", parse_mode=ParseMode.MARKDOWN_V2)
     except Exception as e:
         logger.error(f"Error updating progress: {e}")
 
@@ -96,7 +97,7 @@ async def summarize_command(update: Update, context: CallbackContext):
                 operation_type = OPERATION_TYPE_TEXT_SIMPLE # Treat as simple
 
         if not operation_type:
-            await update.message.reply_text("No se pudo determinar el tipo de operación de resumen.")
+            await update.message.reply_text("No se pudo determinar el tipo de operación de resumen.", parse_mode=ParseMode.MARKDOWN_V2)
             return
 
         # 2. Apply Limits (if not admin)
@@ -138,7 +139,7 @@ async def summarize_command(update: Update, context: CallbackContext):
                 if elapsed_seconds < cooldown_seconds:
                     remaining_cooldown = int(cooldown_seconds - elapsed_seconds)
                     await update.message.reply_text(
-                        MSG_COOLDOWN_ACTIVE.format(remaining=remaining_cooldown)
+                        MSG_COOLDOWN_ACTIVE.format(remaining=remaining_cooldown), parse_mode=ParseMode.MARKDOWN_V2
                     )
                     return
 
@@ -147,11 +148,11 @@ async def summarize_command(update: Update, context: CallbackContext):
                 current_advanced_ops = user_db.get("advanced_op_today_count", 0)
                 if current_advanced_ops >= DAILY_LIMIT_ADVANCED_OPS:
                     await update.message.reply_text(
-                        MSG_DAILY_LIMIT_REACHED.format(limit=DAILY_LIMIT_ADVANCED_OPS)
+                        MSG_DAILY_LIMIT_REACHED.format(limit=DAILY_LIMIT_ADVANCED_OPS), parse_mode=ParseMode.MARKDOWN_V2
                     )
                     return
 
-        wait_message = await update.message.reply_text("⏳ Procesando tu solicitud...")
+        wait_message = await update.message.reply_text("⏳ Procesando tu solicitud...", parse_mode=ParseMode.MARKDOWN_V2)
 
         # 3. Content Processing
         if not update.message.reply_to_message:
@@ -160,7 +161,7 @@ async def summarize_command(update: Update, context: CallbackContext):
                 chat_id, MAX_RECENT_MESSAGES
             )
             if len(recent_messages) < 5:
-                await wait_message.edit_text(ERROR_MESSAGES["NOT_ENOUGH_MESSAGES"])
+                await wait_message.edit_text(ERROR_MESSAGES["NOT_ENOUGH_MESSAGES"], parse_mode=ParseMode.MARKDOWN_V2)
                 return
             await update_progress(wait_message, PROGRESS_MESSAGES["FORMATTING"])
             formatted_messages = format_recent_messages(recent_messages)
@@ -222,7 +223,7 @@ async def summarize_command(update: Update, context: CallbackContext):
                         content_for_summary = None  # Mark as processed
                     case _:
                         await wait_message.edit_text(
-                            "Este tipo de mensaje no lo puedo resumir crack. Intenta con mensajes de texto, enlaces a YouTube o artículos web, mensajes de voz, archivos de audio, vídeos o documentos (PDF, DOCX, TXT)."
+                            "Este tipo de mensaje no lo puedo resumir crack. Intenta con mensajes de texto, enlaces a YouTube o artículos web, mensajes de voz, archivos de audio, vídeos o documentos (PDF, DOCX, TXT).", parse_mode=ParseMode.MARKDOWN_V2
                         )
                         return
 
@@ -232,7 +233,7 @@ async def summarize_command(update: Update, context: CallbackContext):
                             ERROR_MESSAGES.get(
                                 f"ERROR_CANNOT_SUMMARIZE_{message_type_for_handler.upper()}",
                                 ERROR_MESSAGES["ERROR_EMPTY_SUMMARY"],
-                            )
+                            ), parse_mode=ParseMode.MARKDOWN_V2
                         )
                         return
                     await update_progress(wait_message, PROGRESS_MESSAGES["SUMMARIZING"])
@@ -246,15 +247,15 @@ async def summarize_command(update: Update, context: CallbackContext):
                         ERROR_MESSAGES.get(
                             f"ERROR_CANNOT_SUMMARIZE_{message_type_for_handler.upper()}",
                             ERROR_MESSAGES["ERROR_UNKNOWN"],
-                        )
+                        ), parse_mode=ParseMode.MARKDOWN_V2
                     )
                     return
             except Exception as e:
                 logger.error(f"Error procesando mensaje: {str(e)}", exc_info=True)
                 if wait_message:
-                    await wait_message.edit_text(f"Error procesando el mensaje: {str(e)}")
+                    await wait_message.edit_text(f"Error procesando el mensaje: {escape_markdown_v2(str(e))}", parse_mode=ParseMode.MARKDOWN_V2)
                 else:
-                    await update.message.reply_text(f"Error procesando el mensaje: {str(e)}")
+                    await update.message.reply_text(f"Error procesando el mensaje: {escape_markdown_v2(str(e))}", parse_mode=ParseMode.MARKDOWN_V2)
                 return
 
         # 4. Update Usage Data (if not admin)
@@ -277,6 +278,6 @@ async def summarize_command(update: Update, context: CallbackContext):
     except Exception as e:
         logger.error(f"Error in summarize_command: {e}", exc_info=True)
         if wait_message:
-            await wait_message.edit_text(f"Error al procesar la solicitud: {str(e)}")
+            await wait_message.edit_text(f"Error al procesar la solicitud: {escape_markdown_v2(str(e))}", parse_mode=ParseMode.MARKDOWN_V2)
         else:
-            await update.message.reply_text(f"Error al procesar la solicitud: {str(e)}")
+            await update.message.reply_text(f"Error al procesar la solicitud: {escape_markdown_v2(str(e))}", parse_mode=ParseMode.MARKDOWN_V2)
