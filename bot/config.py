@@ -18,9 +18,8 @@ class Config:
             self.OPENROUTER_API_KEY: Optional[str] = None # For OpenRouter LLM calls
             self.OPENROUTER_SITE_URL: str = "https://github.com/mihailmariusiondev/al-grano-bot" # Default or example URL
             self.OPENROUTER_SITE_NAME: str = "Al-Grano Bot" # Default or example name
-            self.OPENROUTER_PRIMARY_MODEL: str = "deepseek/deepseek-r1:free"
-            self.OPENROUTER_FALLBACK_MODEL: str = "deepseek/deepseek-r1" # Example, confirm actual identifier if different
-
+            self.OPENROUTER_PRIMARY_MODEL: str = "deepseek/deepseek-r1-0528-qwen3-8b:free" # Updated primary model
+            self.OPENROUTER_FALLBACK_MODEL: str = "deepseek/deepseek-r1-0528-qwen3-8b" # Updated fallback model
             # Database settings
             self.DB_PATH: str = "bot.db"
             # Other settings
@@ -37,16 +36,12 @@ class Config:
         self.OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
         self.OPENROUTER_SITE_URL = os.getenv("OPENROUTER_SITE_URL", self.OPENROUTER_SITE_URL)
         self.OPENROUTER_SITE_NAME = os.getenv("OPENROUTER_SITE_NAME", self.OPENROUTER_SITE_NAME)
-
         # Load model identifiers from env, with defaults
-        self.OPENROUTER_PRIMARY_MODEL = os.getenv("OPENROUTER_PRIMARY_MODEL", "deepseek/deepseek-r1:free")
-        self.OPENROUTER_FALLBACK_MODEL = os.getenv("OPENROUTER_FALLBACK_MODEL", "deepseek/deepseek-r1")
-
-
+        self.OPENROUTER_PRIMARY_MODEL = os.getenv("OPENROUTER_PRIMARY_MODEL", self.OPENROUTER_PRIMARY_MODEL) # Default is now the new model
+        self.OPENROUTER_FALLBACK_MODEL = os.getenv("OPENROUTER_FALLBACK_MODEL", self.OPENROUTER_FALLBACK_MODEL) # Default is now the new model
         self.DB_PATH = os.getenv("DB_PATH", "bot.db")
         self.DEBUG_MODE = os.getenv("DEBUG_MODE", "false").lower() == "true"
         self.ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
-
         auto_admin_ids_str = os.getenv("AUTO_ADMIN_USER_IDS_CSV")
         if auto_admin_ids_str:
             try:
