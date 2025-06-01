@@ -95,34 +95,87 @@ async def generate_daily_summary(chat_id: int) -> str:
         return error_msg
 
 
+async def send_daily_summary_for(chat_id: int):
+    """Generate and send a daily summary for a specific chat.
+
+    Args:
+        chat_id: The chat ID to summarize
+    """
+    try:
+        logger.info(f"Generating daily summary for chat {chat_id}")
+
+        # Get chat configuration
+        config = await db_service.get_chat_summary_config(chat_id)
+
+        # Get recent messages (last 24 hours)
+        messages = await db_service.get_recent_messages_by_time(chat_id, hours=24)
+
+        # Check if there are enough messages to summarize
+        if len(messages) < 5:
+            logger.info(f"Not enough messages ({len(messages)}) for chat {chat_id}, skipping summary")
+            return
+
+        # Format messages for the AI
+        formatted_content = format_recent_messages(messages)
+
+        # Determine summary type based on configuration
+        summary_type = f"chat_{config['length']}"  # chat_short, chat_medium, chat_long
+
+        # Generate summary using custom configuration
+        summary = await openai_service.get_summary(
+            content=formatted_content,
+            summary_type=summary_type,
+            language=config['language'],
+            tone=config['tone'],
+            include_names=config['include_names']
+        )
+
+        # Add header to summary
+        madrid_tz = pytz.timezone("Europe/Madrid")
+        yesterday = (datetime.now(madrid_tz) - timedelta(days=1)).strftime("%d/%m/%Y")
+
+        final_summary = f"📅 **Resumen del día {yesterday}**\n\n{summary}"
+
+        # Send the summary to the chat
+        success = await message_service.send_message(
+            chat_id=chat_id,
+            text=final_summary,
+            parse_mode="Markdown"
+        )
+
+        if success:
+            logger.info(f"Successfully sent daily summary to chat {chat_id}")
+        else:
+            logger.warning(f"Failed to send daily summary to chat {chat_id}, removing scheduled job")
+            try:
+                from bot.services.scheduler_service import scheduler_service
+                scheduler_service.remove_daily_summary_job(chat_id)
+            except Exception as cleanup_error:
+                logger.error(f"Error removing job for failed chat {chat_id}: {cleanup_error}")
+
+    except Exception as e:
+        logger.error(f"Error sending daily summary for chat {chat_id}: {e}", exc_info=True)
+
+
 async def send_daily_summaries():
     """
     Send daily summaries to all chats that have enabled the feature
+    (Backward compatibility function - now uses new configuration system)
     """
     try:
-        # Get all chats with daily summary enabled
-        query = """
-            SELECT chat_id
-            FROM telegram_chat_state
-            WHERE daily_summary_enabled = TRUE
-        """
-        enabled_chats = await db_service.fetch_all(query)
+        # Get all chats with daily summary enabled using new configuration
+        configs = await db_service.get_all_daily_summary_configs()
 
-        if not enabled_chats:
+        if not configs:
             logger.info("No chats have daily summaries enabled")
             return
 
-        logger.info(f"Generating daily summaries for {len(enabled_chats)} chats")
+        logger.info(f"Generating daily summaries for {len(configs)} chats")
 
-        for chat in enabled_chats:
-            chat_id = chat["chat_id"]
+        for config in configs:
+            chat_id = config["chat_id"]
             try:
-                summary = await generate_daily_summary(chat_id)
-                # Send the summary using the message service
-                await message_service.send_message(
-                    chat_id=chat_id, text=summary, parse_mode="Markdown"
-                )
-                logger.info(f"Sent daily summary to chat {chat_id}")
+                await send_daily_summary_for(chat_id)
             except Exception as e:
                 logger.error(f"Error processing summary for chat {chat_id}: {e}")
                 continue

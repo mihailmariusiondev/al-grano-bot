@@ -1,5 +1,7 @@
 import aiosqlite
 from typing import Optional, List, Dict
+from datetime import datetime, timedelta
+import pytz
 from bot.utils.constants import MAX_RECENT_MESSAGES
 from ..utils.logger import logger
 
@@ -177,6 +179,72 @@ class DatabaseService:
                     else:  # Column already exists
                         pass
 
+            # Create chat_summary_config table
+            await self.conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS chat_summary_config (
+                    chat_id             INTEGER PRIMARY KEY,
+                    tone                TEXT    NOT NULL DEFAULT 'neutral',
+                    length              TEXT    NOT NULL DEFAULT 'medium',
+                    language            TEXT    NOT NULL DEFAULT 'es',
+                    include_names       BOOLEAN NOT NULL DEFAULT 1,
+                    daily_summary_hour  TEXT    NOT NULL DEFAULT 'off',
+                    created_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+                """
+            )
+
+            # Create trigger for chat_summary_config updated_at
+            await self.conn.execute(
+                """
+                CREATE TRIGGER IF NOT EXISTS update_chat_summary_config_updated_at
+                AFTER UPDATE ON chat_summary_config
+                FOR EACH ROW
+                BEGIN
+                    UPDATE chat_summary_config SET updated_at = CURRENT_TIMESTAMP WHERE chat_id = OLD.chat_id;
+                END;
+                """
+            )
+
+            # Migration logic: transfer existing configuration from telegram_chat_state
+            try:
+                # Check if there are any existing configurations to migrate
+                existing_configs = await self.conn.execute(
+                    """
+                    SELECT chat_id, summary_type, daily_summary_enabled
+                    FROM telegram_chat_state
+                    WHERE summary_type IS NOT NULL OR daily_summary_enabled IS NOT NULL
+                    """
+                )
+                rows = await existing_configs.fetchall()
+
+                if rows:
+                    self.logger.info(f"Migrating {len(rows)} existing chat configurations...")
+
+                    for row in rows:
+                        chat_id = row[0]
+                        summary_type = row[1] if row[1] else 'medium'
+                        daily_summary_enabled = row[2] if row[2] else False
+
+                        # Map old summary_type to new length
+                        length = 'short' if summary_type == 'short' else 'long'
+                        daily_hour = '03' if daily_summary_enabled else 'off'
+
+                        # Insert into new table (ignore if already exists)
+                        await self.conn.execute(
+                            """
+                            INSERT OR IGNORE INTO chat_summary_config(
+                                chat_id, tone, length, language, include_names, daily_summary_hour
+                            ) VALUES (?, 'neutral', ?, 'es', 1, ?)
+                            """,
+                            (chat_id, length, daily_hour)
+                        )
+
+                    self.logger.info("Migration completed successfully")
+            except Exception as e:
+                self.logger.warning(f"Migration from old schema failed (this is normal for new installations): {e}")
+
             await self.conn.commit()
             self.logger.info("Database initialized successfully")
 
@@ -228,19 +296,50 @@ class DatabaseService:
             self.logger.info("Database connection closed")
             self.conn = None
 
-    async def get_recent_messages(self, chat_id: int, limit: int = 300) -> List[Dict]:
-        """Get recent messages from a chat"""
+    async def get_recent_messages(self, chat_id: int, limit: int = 300, hours: int = None) -> List[Dict]:
+        """Get recent messages from a chat.
+
+        Args:
+            chat_id: The chat ID
+            limit: Maximum number of messages to retrieve
+            hours: If provided, only get messages from the last N hours
+
+        Returns:
+            A list of message dictionaries with sender_name included
+        """
         try:
-            query = """
-                SELECT m.message_text, m.telegram_message_id, m.telegram_reply_to_message_id,
-                       u.user_id, u.first_name, u.last_name, u.username
-                FROM telegram_message m
-                JOIN telegram_user u ON m.user_id = u.user_id
-                WHERE m.chat_id = ?
-                ORDER BY m.telegram_message_id DESC
-                LIMIT ?
-            """
-            messages = await self.fetch_all(query, (chat_id, limit))
+            if hours is not None:
+                # Get messages from the last N hours
+                madrid_tz = pytz.timezone("Europe/Madrid")
+                now = datetime.now(madrid_tz)
+                start_time = now - timedelta(hours=hours)
+                start_time_utc = start_time.astimezone(pytz.UTC)
+
+                query = """
+                    SELECT m.message_text, m.telegram_message_id, m.telegram_reply_to_message_id,
+                           u.user_id, u.first_name, u.last_name, u.username, m.created_at
+                    FROM telegram_message m
+                    JOIN telegram_user u ON m.user_id = u.user_id
+                    WHERE m.chat_id = ? AND m.created_at >= ?
+                    ORDER BY m.telegram_message_id ASC
+                    LIMIT ?
+                """
+                messages = await self.fetch_all(query, (chat_id, start_time_utc.isoformat(), limit))
+            else:
+                # Get the most recent messages up to the limit
+                query = """
+                    SELECT m.message_text, m.telegram_message_id, m.telegram_reply_to_message_id,
+                           u.user_id, u.first_name, u.last_name, u.username, m.created_at
+                    FROM telegram_message m
+                    JOIN telegram_user u ON m.user_id = u.user_id
+                    WHERE m.chat_id = ?
+                    ORDER BY m.telegram_message_id DESC
+                    LIMIT ?
+                """
+                messages = await self.fetch_all(query, (chat_id, limit))
+                # Reverse to get chronological order
+                messages.reverse()
+
             return messages
         except Exception as e:
             self.logger.error(f"Error getting recent messages: {e}")
@@ -451,5 +550,149 @@ class DatabaseService:
             self.logger.error(f"Error fetching admin users: {e}")
             return []
 
+    async def get_chat_summary_config(self, chat_id: int) -> dict:
+        """Get chat summary configuration, create with defaults if not exists.
+
+        Args:
+            chat_id: The chat ID
+
+        Returns:
+            Dictionary with configuration settings
+        """
+        try:
+            config = await self.fetch_one(
+                "SELECT * FROM chat_summary_config WHERE chat_id = ?", (chat_id,)
+            )
+
+            if not config:
+                # Create default configuration
+                default_config = {
+                    'tone': 'neutral',
+                    'length': 'medium',
+                    'language': 'es',
+                    'include_names': True,
+                    'daily_summary_hour': 'off'
+                }
+
+                await self.execute(
+                    """
+                    INSERT INTO chat_summary_config (
+                        chat_id, tone, length, language, include_names, daily_summary_hour
+                    ) VALUES (?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        chat_id,
+                        default_config['tone'],
+                        default_config['length'],
+                        default_config['language'],
+                        default_config['include_names'],
+                        default_config['daily_summary_hour']
+                    )
+                )
+
+                # Return the default configuration with chat_id
+                config = default_config.copy()
+                config['chat_id'] = chat_id
+                self.logger.info(f"Created default summary config for chat {chat_id}")
+
+            return dict(config)
+        except Exception as e:
+            self.logger.error(f"Error getting chat summary config for {chat_id}: {e}")
+            raise
+
+    async def update_chat_summary_config(self, chat_id: int, changes: dict) -> bool:
+        """Update specific fields in chat summary configuration.
+
+        Args:
+            chat_id: The chat ID
+            changes: Dictionary with fields to update
+
+        Returns:
+            True if update was successful, False otherwise
+        """
+        try:
+            if not changes:
+                return True
+
+            # Ensure the config exists first
+            await self.get_chat_summary_config(chat_id)
+
+            # Build the update query
+            set_clauses = [f"{key} = ?" for key in changes.keys()]
+            params = list(changes.values()) + [chat_id]
+
+            query = f"""
+                UPDATE chat_summary_config
+                SET {", ".join(set_clauses)}, updated_at = CURRENT_TIMESTAMP
+                WHERE chat_id = ?
+            """
+
+            await self.execute(query, tuple(params))
+            self.logger.info(f"Updated summary config for chat {chat_id}: {', '.join(changes.keys())}")
+            return True
+        except Exception as e:
+            self.logger.error(f"Error updating chat summary config for {chat_id}: {e}")
+            return False
+
+    async def get_all_daily_summary_configs(self) -> List[Dict]:
+        """Get all chats with daily summaries enabled and their configurations.
+
+        Returns:
+            List of dicts with chat_id and daily_summary_hour for each configured chat
+        """
+        try:
+            query = """
+                SELECT chat_id, daily_summary_hour
+                FROM chat_summary_config
+                WHERE daily_summary_hour != 'off'
+            """
+            configs = await self.fetch_all(query)
+            self.logger.info(f"Retrieved {len(configs)} daily summary configurations")
+            return configs
+        except Exception as e:
+            self.logger.error(f"Error getting all daily summary configs: {e}")
+            return []
+
+    async def get_recent_messages_by_time(self, chat_id: int, hours: int = 24) -> List[Dict]:
+        """Get recent messages from a chat within a specific time window.
+
+        Args:
+            chat_id: The chat ID
+            hours: Number of hours to look back from now
+
+        Returns:
+            List of recent messages within the time window
+        """
+        try:
+            from datetime import datetime, timedelta
+            import pytz
+
+            # Calculate the time window
+            madrid_tz = pytz.timezone("Europe/Madrid")
+            now = datetime.now(madrid_tz)
+            start_time = now - timedelta(hours=hours)
+
+            # Convert to UTC for database query
+            start_time_utc = start_time.astimezone(pytz.UTC)
+            now_utc = now.astimezone(pytz.UTC)
+
+            query = """
+                SELECT m.message_text, m.telegram_message_id, m.telegram_reply_to_message_id,
+                       u.user_id, u.first_name, u.last_name, u.username, m.created_at
+                FROM telegram_message m
+                JOIN telegram_user u ON m.user_id = u.user_id
+                WHERE m.chat_id = ?
+                AND m.created_at BETWEEN ? AND ?
+                ORDER BY m.telegram_message_id ASC
+            """
+            messages = await self.fetch_all(
+                query,
+                (chat_id, start_time_utc.isoformat(), now_utc.isoformat())
+            )
+            self.logger.info(f"Retrieved {len(messages)} messages from last {hours} hours for chat {chat_id}")
+            return messages
+        except Exception as e:
+            self.logger.error(f"Error getting recent messages by time: {e}")
+            return []
 
 db_service = DatabaseService()  # Single instance
