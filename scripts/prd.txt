@@ -1,0 +1,723 @@
+<context>
+# Overview
+Al-Grano Bot ayuda a los administradores de grupos y usuarios en chats privados a personalizar cómo el bot genera resúmenes de conversación en Telegram. En vez de depender de múltiples comandos sueltos (como `/toggle_summary_type` o `/toggle_daily_summary`), este PRD unifica todas las opciones—tono, longitud, idioma, inclusión de nombres y horario de resumen diario—en un único flujo de configuración (`/configurar_resumen`).
+- **Problema que resuelve**: Actualmente, los bots de resumen ofrecen toggles fragmentados o ajustes limitados. Esto obliga a los administradores a memorizar varios comandos y carece de una experiencia centralizada.
+- **Quién lo usa**:
+  - **Administradores de grupo** que quieren controlar el estilo y momento de los resúmenes automáticos.
+  - **Usuarios en chat privado** que desean adaptar el comportamiento de resúmenes para sus propias conversaciones con el bot.
+- **Valor**:
+  - Centraliza todas las opciones de personalización en un solo punto (mejorando la usabilidad).
+  - Permite a cada chat tener su propio “perfil” de resúmenes (tono, idioma, nivel de detalle), aumentando la relevancia y coherencia de los resúmenes generados.
+  - Facilita la programación de resúmenes diarios a la hora que convenga al grupo, sin necesidad de comandos dispares.
+
+# Core Features
+
+1. **Menú Único de Configuración (`/configurar_resumen`)**
+
+   * **Qué hace**: Muestra el estado actual de cinco parámetros (`tono`, `longitud`, `idioma`, `incluir nombres`, `hora de resumen diario`) y permite cambiar cada uno vía botones inline.
+   * **Por qué es importante**: Reemplaza dos comandos independientes (`/toggle_summary_type` y `/toggle_daily_summary`) con un único punto de entrada, reduciendo confusión y pasos.
+   * **Cómo funciona (alto nivel)**:
+
+     1. Al invocar `/configurar_resumen`, el bot lee o crea en BD la fila `chat_summary_config(chat_id, tone, length, language, include_names, daily_summary_hour)`.
+     2. Envía un mensaje con las etiquetas actuales y cinco botones inline (Tono, Longitud, Idioma, Nombres, Hora).
+     3. Cada botón edita ese mensaje para desplegar un submenú de opciones concretas; al seleccionar, se actualiza BD y se responde con un pequeño “toast” (answerCallbackQuery), luego se regresa al menú principal.
+
+2. **Submenús Inline para Cada Parámetro**
+
+   * **Qué hace**: Cada parámetro (p. ej., “Tono”) abre un submenú con sus posibles valores (`neutral`, `informal`, `sarcastic`, `ironic`, `absurd`).
+   * **Por qué es importante**: Permite escoger rápidamente cada opción sin escribir comandos de texto.
+   * **Cómo funciona (alto nivel)**:
+
+     1. Pulsar “🧠 Tono” envía un callback `cfg|tone|open`.
+     2. El bot valida permisos (solo admins en grupos, o usuario en privado), edita el mensaje a la vista de opciones de tono con botones que envían `cfg|tone|<valor>`.
+     3. Al elegir un valor, BD se actualiza y el bot responde `answerCallbackQuery("✅ Tono actualizado a: Sarcástico 😈")`, luego edita el mensaje principal para reflejar el nuevo “Tono”.
+
+3. **Generación Dinámica de Prompt para Resúmenes de Chat (sin Reply)**
+
+   * **Qué hace**: Cuando el usuario ejecuta `/summarize` sin responder a un mensaje, el bot arma un “system prompt” parametrizado con el `tone`, `length`, `language`, y `include_names` obtenidos de `chat_summary_config`.
+   * **Por qué es importante**: Convierte a OpenAI en un LLM que produce resúmenes ajustados al estilo deseado por cada comunidad o usuario.
+   * **Cómo funciona (alto nivel)**:
+
+     1. Leer `chat_summary_config` y pasar esos cuatro parámetros a la función `get_summary_prompt(...)`, la cual devuelve un string en el idioma correcto y con instrucciones claras (“Resume con tono sarcástico… longitud media… menciona participantes…”).
+     2. Recuperar hasta 300 mensajes recientes, formatearlos y enviarlos a `openai_service.chat_completion_openrouter` junto con el prompt generado.
+     3. Enviar el resultado al chat usando `send_long_message`.
+
+4. **Scheduler Dinámico para Resumen Diario**
+
+   * **Qué hace**: Programa (o cancela) un job en APScheduler por chat, según el campo `daily_summary_hour` (`00`,`03`,`08`,`12`,`18`,`21` o `off`).
+   * **Por qué es importante**: Los grupos pueden recibir un resumen diario de su actividad a la hora más conveniente, sin tener que ejecutar manualmente `/summarize`.
+   * **Cómo funciona (alto nivel)**:
+
+     1. Al iniciar el bot, se cargan todas las filas de `chat_summary_config` con `daily_summary_hour ≠ 'off'` y se crea un job `(id="daily_summary_<chat_id>")` que ejecuta `send_daily_summary_for(chat_id)` cada día a la hora especificada (zona CET/CEST).
+     2. Si un admin cambia su `daily_summary_hour` en el submenú, el callback reprograma o elimina ese job en caliente (usando `replace_existing=True` o `remove_job`).
+
+5. **Eliminación de Comandos y Lógica Obsoletos**
+
+   * **Qué hace**: Remueve `/toggle_summary_type` y `/toggle_daily_summary` (archivos y referencias) de la base de código y del mensaje de ayuda.
+   * **Por qué es importante**: Evita confusión, reduce mantenimiento de código duplicado y consolida la configuración en un solo flujo.
+   * **Cómo funciona (alto nivel)**:
+
+     1. Borrar los archivos `toggle_summary_type_command.py` y `toggle_daily_summary_command.py`.
+     2. Quitar sus importaciones en `bot/commands/__init__.py` y su registro en `bot/bot.py`.
+     3. Actualizar el texto de `/help` para que solo liste los comandos válidos: `/start`, `/summarize`, `/help`, `/configurar_resumen`.
+
+# User Experience
+
+### User Personas
+
+1. **Administrador de Grupo**
+
+   * Perfil: Crea y modera un grupo de Telegram; desea resumir la actividad grupal de manera regular y con un estilo específico (más formal, más irónico, etc.).
+   * Objetivo: Configurar el bot para que se adapte al tono de su comunidad y/o reciba un resumen diario a la hora óptima.
+
+2. **Usuario Privado (Chat 1:1 con el Bot)**
+
+   * Perfil: Un usuario que habla en privado con el bot y quiere resúmenes de sus propias notas o conversaciones.
+   * Objetivo: Personalizar el comportamiento del bot para su propio caso de uso (p. ej., resúmenes en inglés y sin incluir nombres).
+
+3. **Usuario No Administrador en Grupo**
+
+   * Perfil: Miembro normal de un grupo donde el bot ya está configurado; desea usar `/summarize` pero no cambiar configuraciones.
+   * Objetivo: Obtener resúmenes sin preocuparse por la configuración, ya que la decide el admin.
+
+### Key User Flows
+
+1. **Inicialización en Chat Nuevo**
+
+   * El bot 🆕 es agregado a un grupo o es “Iniciado” en diálogo privado.
+   * El primer `/summarize` dispara la creación de `chat_summary_config` con valores por defecto y genera un resumen neutral, medio, en español, que incluye nombres.
+
+2. **Configuración Paso a Paso**
+
+   * Admin (o usuario privado) escribe `/configurar_resumen`.
+   * Bot muestra el menú principal con los cinco parámetros y botones inline.
+   * Admin pulsa “🧠 Tono” → edita a submenú de tonos → pulsa “Sarcástico” → BD se actualiza, toast “✅ Tono actualizado a: Sarcástico 😈” → vuelve al menú principal con “Tono: Sarcástico 😈” reflejado.
+   * Admin pulsa “⏰ Hora” → edita a submenú de horas → elige “08:00” → BD se actualiza, job diario reprogramado a las 08:00 CET/CEST → toast “✅ Resumen diario programado a las 08:00” → vuelve al menú principal con “Resumen diario: 08:00 AM ⏰”.
+
+3. **Uso de `/summarize` (Sin Reply)**
+
+   * Cualquier usuario ejecuta `/summarize` sin reply.
+   * Bot obtiene configuraciones: (p. ej.) tono=sarcastic, length=medium, language=es, include\_names=true.
+   * Genera prompt: “Eres un asistente que resume con tono sarcástico, longitud media, en español, incluyendo nombres…”.
+   * Recopila últimos mensajes, los formatea y envía a OpenAI.
+   * Bot devuelve el resumen en ese estilo, dividido en chunks si es muy largo.
+
+4. **Uso de `/summarize` (Con Reply a Contenido Específico)**
+
+   * Usuario responde a un mensaje (texto/YouTube/artículo/audio/video/documento) con `/summarize`.
+   * Bot detecta tipo, usa el handler apropiado y los prompts fijos (por ejemplo, `youtube_template` si venía enlace de YouTube).
+   * El resultado no se ve afectado por la configuración de `chat_summary_config`.
+
+### UI/UX Considerations
+
+* **Inline Keyboard Limpio y Consistente**:
+
+  * Menú principal en dos filas (3 botones arriba, 2 abajo).
+  * Submenús con botones agrupados lógicamente (ej. tonos en filas de 3+2).
+* **Edición de Mensajes en Lugar de Enviar Nuevos**:
+
+  * Cada pulsación solo edita el mensaje original, manteniendo el hilo limpio y evitando spam.
+* **Feedback Inmediato**:
+
+  * Cada selección dispara un `answerCallbackQuery` con un texto breve (“✅ … actualizado a …”).
+  * Mensajes de error o permisos insuficientes se muestran como alertas de callback, sin interrumpir el menú.
+* **Localización Dinámica**:
+
+  * Toda la UI (títulos, botones, confirmaciones) adap­tada al idioma actual seleccionado.
+  * Si el idioma no está implementado, se indica con un toast “Este idioma todavía no está disponible” en el idioma original.
+* **Consistencia Visual**:
+
+  * Uso de emojis para reforzar visualmente cada opción (😈 para sarcástico, 📏 para medio, 🇪🇸 para español, 🧍 para incluir nombres, ⏰ para hora).
+  * Texto claro y directo, manteniendo el tono irreverente de Al-Grano Bot, pero evitando expresiones vulgares en menús.
+
+</context>
+
+<PRD>
+# Technical Architecture
+## 1. Componentes del Sistema
+1. **Telegram Bot (bot/bot.py)**
+   - Se basa en `python-telegram-bot` (ApplicationBuilder).
+   - Registra tres “entry points” principales:
+     1. Comando `/configurar_resumen` → `configure_summary_command`
+     2. Callbacks “cfg|…” → `configure_summary_callback`
+     3. Comando `/summarize` → `summarize_command` (ajustado para leer configuración).
+   - Integra un `post_shutdown` handler que detiene el scheduler y cierra la DB.
+
+2. **Servicio de Base de Datos (bot/services/database\_service.py)**
+
+   * Usando `aiosqlite` para operaciones asíncronas.
+   * Tablas importantes:
+
+     * **`telegram_user`**, **`telegram_chat_state`**, **`telegram_message`** (existentes).
+     * **`chat_summary_config`** (nueva).
+   * Métodos relevantes: `get_chat_summary_config`, `update_chat_summary_config`, `get_recent_messages`, `get_or_create_user`, etc.
+
+3. **Servicio de Scheduler (bot/services/scheduler\_service.py)**
+
+   * Usa `APScheduler` (AsyncIOScheduler + CronTrigger).
+   * Al iniciar, lee todas las filas de `chat_summary_config` con `daily_summary_hour <> 'off'` y crea un job por chat con id `daily_summary_<chat_id>`.
+   * Expone métodos para reprogramar o eliminar jobs en caliente cuando se actualiza `daily_summary_hour`.
+   * Mantiene el job de envío llamando a `daily_summary_service.send_daily_summary_for(chat_id)`.
+
+4. **Servicio de Resúmenes/IA (bot/services/openai\_service.py)**
+
+   * Dos clientes `AsyncOpenAI`:
+
+     1. **`openrouter_client`**: Para llamadas de chat completions (modelo principal y fallback).
+     2. **`openai_client`**: Para transcripciones de audio (Whisper).
+   * Método clave: `get_summary(content, summary_type, language)` → arma un sistema de mensajes usando `ALL_SUMMARY_PROMPTS[summary_type]`.
+   * Método adicional: `summarize_large_document(text)` → divide en chunks según `MAX_INPUT_CHARS_PRIMARY_MODEL`, procesa en paralelo, luego concatena y re-sintetiza el resumen final.
+
+5. **Servicio de Mensajería (bot/services/message\_service.py)**
+
+   * Wrap alrededor de `bot.send_message` para simplificar llamadas desde otros servicios (e.g., scheduler).
+
+6. **Handlers Existentes (bot/handlers/...)**
+
+   * Manejadores para contenido avanzado (audio, video, artículos, documentos).
+   * No se modifican en esta fase, salvo que `/summarize` con reply salte directamente a ellos sin leer configuración.
+
+7. **Módulo de Prompts**
+
+   * **`bot/prompts/custom_chat_prompts.py`** (nuevo): Función `get_summary_prompt(tone, length, language, include_names)`.
+   * Los prompts fijos para multimedia y textual (en `bot/prompts/*_prompts.py`) se mantienen para `/summarize` con reply.
+
+8. **Constantes y Etiquetas (bot/utils/constants.py)**
+
+   * Añadir diccionario `LABELS` con todas las cadenas (títulos, botones, mensajes de confirmación) en varios idiomas (`es`, `en`, `fr`, `pt`).
+   * Definir también emojis y etiquetas asociadas a cada valor (`tone`, `length`, etc.).
+
+## 2. Data Models
+
+### 2.1. Tabla `chat_summary_config`
+
+```sql
+CREATE TABLE IF NOT EXISTS chat_summary_config (
+  chat_id             INTEGER PRIMARY KEY,
+  tone                TEXT    NOT NULL DEFAULT 'neutral',
+  length              TEXT    NOT NULL DEFAULT 'medium',
+  language            TEXT    NOT NULL DEFAULT 'es',
+  include_names       BOOLEAN NOT NULL DEFAULT 1,
+  daily_summary_hour  TEXT    NOT NULL DEFAULT 'off'
+);
+```
+
+* **Campos**:
+
+  * `chat_id`: PK, hace referencia al grupo o chat privado.
+  * `tone`: `'neutral' | 'informal' | 'sarcastic' | 'ironic' | 'absurd'`.
+  * `length`: `'short' | 'medium' | 'long'`.
+  * `language`: `'es' | 'en' | 'fr' | 'pt'`.
+  * `include_names`: `1` (true) o `0` (false).
+  * `daily_summary_hour`: `'00','03','08','12','18','21','off'`.
+
+### 2.2. Migración de Datos Antiguos (Opcional)
+
+* Si existen columnas en `telegram_chat_state` (`summary_type`, `daily_summary_enabled`), copiarlas a `chat_summary_config` antes de eliminar:
+
+  ```sql
+  INSERT INTO chat_summary_config(chat_id, tone, length, language, include_names, daily_summary_hour)
+  SELECT chat_id,
+         'neutral',
+         CASE summary_type WHEN 'short' THEN 'short' ELSE 'long' END,
+         'es', 1,
+         CASE WHEN daily_summary_enabled = 1 THEN '03' ELSE 'off' END
+  FROM telegram_chat_state
+  WHERE summary_type IS NOT NULL OR daily_summary_enabled IS NOT NULL;
+  ```
+
+### 2.3. Otras Tablas (sin cambios)
+
+* **`telegram_user`**: Usuarios con campos de límites (`last_text_simple_op_time`, etc.).
+* **`telegram_chat_state`**: Estado general del chat (`is_bot_started`, etc.).
+* **`telegram_message`**: Mensajes guardados para resúmenes de chat.
+
+## 3. APIs e Integraciones
+
+1. **Telegram API**
+
+   * Bot recibe comandos y callbacks via `python-telegram-bot`.
+   * Usa `InlineKeyboardMarkup` y `answerCallbackQuery` para interacción en línea.
+
+2. **OpenAI / OpenRouter API**
+
+   * Resúmenes de chat sin reply: envía `system prompt` + `user content` a OpenRouter (`client.chat.completions.create`) usando modelo principal o fallback.
+   * Transcripciones (Whisper): `client.audio.transcriptions.create(model="whisper-1", file=<audio>)`.
+
+3. **APScheduler**
+
+   * Módulo interno para mantener jobs de resumen diario.
+   * CronTrigger con timezone `"Europe/Madrid"`.
+
+## 4. Infraestructura Requerida
+
+* **Servidor de Bot**
+
+  * Entorno Python 3.12+ (con `python-telegram-bot`, `aiosqlite`, `openai`, `APScheduler`, `pytz`).
+  * Conexión estable a Internet para llamadas a OpenRouter y Telegram.
+* **SQLite local**
+
+  * Archivo `bot.db` (o ruta configurable) para persistir usuarios, mensajes y `chat_summary_config`.
+* **FFmpeg instalado** (para handlers de audio/video, pero no afecta a la configuración).
+* **Variables de entorno**:
+
+  * `BOT_TOKEN`
+  * `OPENROUTER_API_KEY`
+  * `OPENAI_API_KEY_FOR_WHISPER`
+  * `DB_PATH` (opcional)
+  * `DEBUG_MODE`, `LOG_LEVEL`, etc.
+
+---
+
+# Development Roadmap
+
+> **Nota**: A continuación se describen las fases de desarrollo, priorizando dependencias lógicas sobre calendarios. Cada fase constituye un “bloque” que puede dividirse en tickets más granularmente.
+
+## Fase 1: Persistencia de Configuración y Migración
+
+* **Objetivo**: Estructurar la base de datos para alojar la configuración de resúmenes por chat, más la posible migración de datos históricos.
+* **Tareas**:
+
+  1. **Crear Migración de BD**
+
+     * Añadir sentencia SQL para
+
+       * Crear tabla `chat_summary_config` con columnas y valores por defecto.
+       * (Opcional) Migrar datos de `telegram_chat_state(summary_type, daily_summary_enabled)` a `chat_summary_config`.
+  2. **Actualizar `database_service.py`**
+
+     * Agregar método `get_chat_summary_config(chat_id)` (que inserta la fila con valores por defecto si no existe).
+     * Agregar método `update_chat_summary_config(chat_id, changes)`.
+     * Probar unitariamente lectura/escritura de `chat_summary_config`.
+  3. **Actualizar Diagramas de Datos / Documentación**
+
+     * Añadir sección a la documentación interna con la definición de `chat_summary_config`.
+     * Documentar valores permitidos para cada campo.
+
+## Fase 2: Comando `/configurar_resumen` y Submenús
+
+* **Objetivo**: Implementar el flujo completo de configuración en línea, con menús inline y callbacks, sin yet integrar scheduler ni lógica de resumen.
+* **Tareas**:
+
+  1. **Definir Constantes de Etiquetas (LABELS)**
+
+     * En `bot/utils/constants.py`, añadir el diccionario `LABELS`, con traducciones en `es` y `en` mínimamente.
+     * Incluir todos los textos de títulos, botones y confirmaciones.
+  2. **Implementar `configure_summary_command`**
+
+     * Registrar el comando en `bot/bot.py`.
+     * Al ejecutarse, invocar `get_chat_summary_config`, generar el mensaje principal y enviar con `InlineKeyboardMarkup`.
+     * Manejar edición si viene desde un callback (para poder volver al menú).
+  3. **Implementar `configure_summary_callback`**
+
+     * Registrar un único `CallbackQueryHandler` filtrando por `data.startswith("cfg|")`.
+     * Extraer `campo` y `valor` de `callback_data`.
+     * Validar permisos (solo admins o usuario en privado).
+     * Si `valor == "open"`, desplegar submenú correspondiente (editar mensaje).
+     * Si `valor == "back|main"`, re-invocar `configure_summary_command` para regresar.
+     * Si `valor` es un valor válido de opción, invocar `update_chat_summary_config`, enviar `answerCallbackQuery` y re-disparar `configure_summary_command` para refrescar el menú principal.
+     * Manejar errores de BD o edición de mensaje: capturar y loguear, enviar un toast de error.
+
+## Fase 3: Scheduler Dinámico de Resúmenes Diarios
+
+* **Objetivo**: Integrar APScheduler para que, al modificar `daily_summary_hour`, se creen o destruyan jobs que envíen resúmenes diarios.
+* **Tareas**:
+
+  1. **Modificar `scheduler_service.start()`**
+
+     * Al inicializar, leer todas las `chat_summary_config` con `daily_summary_hour <> 'off'` y agregar un job con id `daily_summary_<chat_id>` que ejecute `send_daily_summary_for(chat_id)` a la hora indicada.
+  2. **Agregar Función `send_daily_summary_for(chat_id)`**
+
+     * En `daily_summary_service.py`, exponer un método que llama a `generate_daily_summary(chat_id)` y luego a `message_service.send_message(chat_id, resumen)`.
+  3. **Hacer que el Callback de “Hora” Reprograme el Job**
+
+     * En `configure_summary_callback`, en el caso `campo == "daily_summary_hour"`, después de actualizar BD:
+
+       * Si `valor == 'off'`: `scheduler_service.scheduler.remove_job(job_id)` (si existe).
+       * Si `valor != 'off'`: crear o reemplazar (`replace_existing=True`) el job con `CronTrigger(hour=int(valor), minute=0, timezone="Europe/Madrid")`.
+  4. **Probar en Staging**
+
+     * Configurar varias horas diferentes, reiniciar el bot y verificar que, cuando llega la hora (o forzando triggers cortos), el bot envía el resumen diario.
+     * Probar que al seleccionar “off” el job se detiene inmediatamente.
+
+## Fase 4: Integración del Prompt Dinámico en `/summarize`
+
+* **Objetivo**: Modificar la lógica de `/summarize` sin reply para usar `get_summary_prompt(...)`, en lugar de los prompts fijos de `chat_long` o `chat_short`.
+* **Tareas**:
+
+  1. **Crear `custom_chat_prompts.py`**
+
+     * Definir función `get_summary_prompt(tone, length, language, include_names)` que retorne el texto del prompt de sistema:
+
+       * Construir un párrafo en el idioma correspondiente (usar `LABELS` para frases comunes).
+       * Asegurar que, si `language` no está en `['es','en','fr','pt']`, lanzar error controlado.
+  2. **Modificar `summarize_command.py`**
+
+     * En el caso “sin reply”:
+
+       1. Llamar a `get_chat_summary_config`.
+       2. Llamar a `get_summary_prompt(...)`. Si arroja “idioma no disponible”, responder al usuario y retornar.
+       3. Seguir con recolección de mensajes, formateo y envío a `openai_service.get_summary(content, summary_type="chat_custom", language)`.
+
+          * En `openai_service`, registrar `'chat_custom'` en el tipo `SummaryType`, con un mapeo interno a `get_summary_prompt`.
+       4. Enviar el resultado con `send_long_message`.
+  3. **PRUEBAS**
+
+     * Test unitario para `get_summary_prompt`: verificar que, dadas combinaciones de parámetros, se genere un prompt coherente (tono, longitud e idioma correctos).
+     * Test de `/summarize` sin reply en un chat con configuración no por defecto (p. ej., `language='en'`, `tone='ironic'`) y revisar la llamada a OpenAI (mocker) con el prompt generado.
+
+## Fase 5: Eliminación de Comandos Obsoletos y Actualización de Ayudas
+
+* **Objetivo**: Remover `/toggle_summary_type` y `/toggle_daily_summary` de la base de código y de la documentación, y adaptar `/help` y `/start` para mencionar `/configurar_resumen`.
+* **Tareas**:
+
+  1. **Eliminar Archivos**
+
+     * Borrar `bot/commands/toggle_summary_type_command.py` y `bot/commands/toggle_daily_summary_command.py`.
+     * Quitar sus importaciones en `bot/commands/__init__.py` y `bot/bot.py`.
+  2. **Actualizar `/help`**
+
+     * En `help_command.py`, reemplazar la sección donde se listan `/toggle_daily_summary` y `/toggle_summary_type` por una descripción de `/configurar_resumen`.
+     * Agregar aclaración: “El resumen diario se envía según el horario de Madrid (CET/CEST).”
+     * Asegurar que el mensaje muestre —y solamente— estos comandos en la lista: `/start`, `/summarize`, `/help`, `/configurar_resumen`.
+  3. **Actualizar `/start`**
+
+     * En `start_command.py`, añadir una línea: “Para personalizar los resúmenes (tono, idioma, etc.), usa `/configurar_resumen`.”
+  4. **Pruebas de Regresión**
+
+     * Verificar que invocar `/toggle_summary_type` o `/toggle_daily_summary` genere una respuesta: “Este comando ya no existe. Usa /configurar\_resumen.”
+     * Probar cada comando listado en `/help` genera la acción correcta.
+
+## Fase 6: Testing End-to-End y QA
+
+* **Objetivo**: Asegurar que todos los flujos descritos funcionan sin errores en un entorno de staging real.
+* **Tareas**:
+
+  1. **Pruebas Unitarias**
+
+     * Cobertura del 80 % para:
+
+       * Métodos de BD (`get_chat_summary_config`, `update_chat_summary_config`).
+       * Función `get_summary_prompt`.
+       * Callbacks del flujo `configure_summary_callback` (opciones válidas y casos de permisos).
+       * Lógica de reprogramación en `scheduler_service`.
+  2. **Pruebas de Integración (Mockeando Telegram y OpenAI)**
+
+     * Simular un chat de grupo, invocar `/configurar_resumen` → pulsar cada botón → verificar BD.
+     * Simular uso de `/summarize` sin reply → mockear llamada a OpenAI y revisar que el prompt pasa correctamente.
+     * Simular `/summarize` con reply (audio, doc, etc.) para asegurar que no se aplica la configuración.
+  3. **Pruebas Manuales en Staging**
+
+     * Grupo de prueba con dos administradores y dos usuarios normales.
+     * Validar permisos: solo admins ven los botones de configuración.
+     * Validar scheduler: configurar varias horas, reiniciar bot, verificar envíos de resumen diario (o cambiar temporalmente el trigger a cada minuto para pruebas rápidas).
+     * Validar mensajes de error: idioma no disponible, BD inaccesible.
+
+## Fase 7: Monitoreo y Optimización Post-Despliegue
+
+* **Objetivo**: Garantizar estabilidad al escalar y corregir errores de producción.
+* **Tareas**:
+
+  1. **Logs y Métricas**
+
+     * Registrar cada cambio de configuración con nivel INFO/DEBUG: “Usuario X cambió campo Y de A a B en chat Z”.
+     * Registrar errores en callbacks o scheduler con nivel ERROR.
+     * Monitorizar el número de jobs en APScheduler y latencia media de edición de mensajes (ideal < 1 s).
+  2. **Verificación de Consistencia**
+
+     * Pulir la lógica de arranque del scheduler: eliminar jobs huérfanos, recargar desde BD cada vez que el bot arranca.
+     * Si detecta un chat donde el bot ya no está (p. ej., expulsado), capturar excepción en `send_daily_summary_for` y eliminar el job.
+  3. **Iteración sobre UX**
+
+     * Recoger feedback de admins sobre claridad de menús, textos e íconos.
+     * Ajustar etiquetas o descripciones en `LABELS` si es necesario.
+  4. **Preparar Fase 2 (Extensiones)**
+
+     * Basado en uso real, planificar nuevas localizaciones de idiomas o refinamientos de prompts.
+
+# Logical Dependency Chain
+
+1. **Fundación de Datos (chat\_summary\_config)**
+
+   * Implementar y probar la creación de la tabla y métodos de lectura/escritura en `database_service.py`.
+   * Migrar valores antiguos (si aplicable).
+
+2. **Constantes y Etiquetas Localizadas (`LABELS`)**
+
+   * Definir `LABELS` en `constants.py` con soportes mínimos (`es`, `en`).
+   * Probar acceso antes de construir menús.
+
+3. **Comando `/configurar_resumen` (handler inicial)**
+
+   * Registrar comando en `bot/bot.py`.
+   * Implementar `configure_summary_command` que muestra menú principal.
+
+4. **Callback Handler (`configure_summary_callback`)**
+
+   * Registrar un `CallbackQueryHandler` que detecte `cfg|...`.
+   * Casos:
+
+     1. `open` → desplegar submenú.
+     2. `campo|valor` → actualizar BD, enviar toast, volver a menú principal.
+     3. `back|main` → invocar de nuevo `configure_summary_command`.
+
+5. **Submenús Inline (Tono, Longitud, Idioma, Nombres, Hora)**
+
+   * Para cada `campo|open`, implementar las vistas en `configure_summary_callback`.
+   * Validar permisos en cada paso.
+
+6. **Scheduler Dinámico**
+
+   * Modificar `scheduler_service.start()` para cargar jobs actuales desde BD.
+   * En `configure_summary_callback`, después de `update_chat_summary_config`, reprogramar o eliminar job según `daily_summary_hour`.
+
+7. **Función Dinámica de Prompt (`get_summary_prompt`)**
+
+   * Crear `bot/prompts/custom_chat_prompts.py` con la lógica que, dados (`tone`,`length`,`language`,`include_names`), devuelva un prompt de sistema lógicamente coherente.
+   * Manejar casos de idioma no soportado.
+
+8. **Integración en `/summarize` Sin Reply**
+
+   * Ajustar `summarize_command.py` de manera que:
+
+     1. Obtenga configuración con `get_chat_summary_config`.
+     2. Obtenga prompt con `get_summary_prompt`.
+     3. Llamar a `openai_service.get_summary(..., summary_type="chat_custom", language)`.
+     4. Enviar resultado.
+
+9. **Eliminación de Comandos Obsoletos**
+
+   * Remover físicamente `[toggle_summary_type, toggle_daily_summary]` y sus referencias en `/help` y en el registro de handlers.
+
+10. **Pruebas Unitarias y de Integración**
+
+    * Testear:
+
+      1. Métodos de BD (`get_/update_chat_summary_config`).
+      2. Callbacks de cada flujo (`open`, `valor`, `back`).
+      3. Prompt dinámico para cada combinación de parámetros.
+      4. Scheduler (agregar/editar/eliminar jobs).
+      5. `/summarize` sin reply: verificar llamada a OpenAI con prompt correcto.
+
+11. **QA Manual en Staging**
+
+    * Simular chats privados y de grupo, probar permisos, resúmenes diarios, interacción básica.
+
+12. **Despliegue y Monitoreo**
+
+    * Poner en producción, monitorear logs, corregir bugs puntuales, iterar sobre prompts/UX.
+
+# Risks and Mitigations
+
+1. **Escalabilidad del Scheduler**
+
+   * **Riesgo**: Si hay cientos de chats con resumen diario, APScheduler puede agotar memoria o CPU.
+   * **Mitigación**:
+
+     * En producción monitorizar cuidadosamente el número de jobs.
+     * Si crece demasiado, migrar a un esquema “job maestro” que recorra la tabla cada minuto y envíe resúmenes pendientes, en lugar de un job por chat.
+
+2. **Fallos en `edit_message_text`**
+
+   * **Riesgo**: Si el mensaje original de configuración fue borrado o expiró, `edit_message_text` lanza `BadRequest`.
+   * **Mitigación**:
+
+     * En cada callback, capturar excepciones de edición.
+     * En caso de error, enviar un nuevo mensaje de configuración en lugar de editar, para reenganchar al usuario.
+
+3. **Permisos de Callback**
+
+   * **Riesgo**: Un usuario malintencionado podría manipular manualmente `callback_data` para forzar cambios de configuración.
+   * **Mitigación**:
+
+     * En cada callback, verificar si `chat.type in ['group','supergroup']` y que `from_user` sea admin real usando `get_chat_member`.
+     * En privado, permitir siempre.
+
+4. **Prompt Dinámico Incorrecto o Incompleto**
+
+   * **Riesgo**: El prompt generado por `get_summary_prompt` podría no reflejar correctamente los parámetros, provocando resúmenes confusos o irrelevantes.
+   * **Mitigación**:
+
+     * Definir plantillas patrón clarísimas para cada combinación de `tone` y `length`.
+     * Incluir ejemplos en tests unitarios para validar que el prompt contenga keywords específicas (“sarcasm”, “concise”, “long”, “nombre de usuario”, etc.).
+     * Revisar manualmente varios resúmenes de prueba.
+
+5. **Migración de Datos Incompleta**
+
+   * **Riesgo**: Si la migración de `summary_type` y `daily_summary_enabled` a `chat_summary_config` falla, los chats históricos perderían su configuración.
+   * **Mitigación**:
+
+     * Incluir un script de migración que verifique conteos antes y después.
+     * Realizar pruebas en staging que validen que cada chat antiguo mantenga su configuración equivalente.
+     * Mantener temporalmente un fallback para leer de campos antiguos si la fila nueva no existe, solo durante la transición.
+
+6. **Recursos de API de OpenRouter / OpenAI**
+
+   * **Riesgo**: Altos volúmenes de llamadas a la API pueden generar latencia o bloqueo de cuotas.
+   * **Mitigación**:
+
+     * Introducir un mecanismo de caching (por ejemplo, cachear resúmenes de chat cuando no cambian los últimos mensajes).
+     * Limitar la frecuencia de `/summarize` para usuarios gratuitos (ya implementado).
+     * Monitorear el uso y, si es necesario, cambiar a un plan de mayor capacidad o a un modelo secundario de menor costo.
+
+# Appendix
+
+## A. SQL Schema
+
+```sql
+-- Tabla principal para configuración de resúmenes por chat
+CREATE TABLE IF NOT EXISTS chat_summary_config (
+  chat_id             INTEGER PRIMARY KEY,
+  tone                TEXT    NOT NULL DEFAULT 'neutral',
+  length              TEXT    NOT NULL DEFAULT 'medium',
+  language            TEXT    NOT NULL DEFAULT 'es',
+  include_names       BOOLEAN NOT NULL DEFAULT 1,
+  daily_summary_hour  TEXT    NOT NULL DEFAULT 'off'
+);
+
+-- Script opcional de migración de datos desde las tablas antiguas
+INSERT INTO chat_summary_config(chat_id, tone, length, language, include_names, daily_summary_hour)
+SELECT chat_id,
+       'neutral',
+       CASE summary_type WHEN 'short' THEN 'short' ELSE 'long' END,
+       'es',
+       1,
+       CASE WHEN daily_summary_enabled = 1 THEN '03' ELSE 'off' END
+FROM telegram_chat_state
+WHERE summary_type IS NOT NULL OR daily_summary_enabled IS NOT NULL;
+```
+
+## B. Ejemplo de `LABELS` (fragmento)
+
+```python
+LABELS = {
+  'es': {
+    'title_main': "⚙️ Configuración actual de resúmenes en este chat:",
+    'tone_button': "🧠 Tono",
+    'buttons': {
+      'tone': {
+        'neutral': "Neutral 🧾",
+        'informal': "Informal 🙂",
+        'sarcastic': "Sarcástico 😈",
+        'ironic': "Irónico 🙃",
+        'absurd': "Absurdo 🤪"
+      },
+      'length': {
+        'short': "Corto ✂️",
+        'medium': "Medio 📏",
+        'long': "Largo 📚"
+      },
+      'language': {
+        'es': "Español 🇪🇸",
+        'en': "Inglés 🇬🇧",
+        'fr': "Francés 🇫🇷",
+        'pt': "Portugués 🇵🇹"
+      },
+      'include_names': {
+        'true': "Sí 🧍",
+        'false': "No 🚫"
+      },
+      'daily_summary_hour': {
+        '00': "00:00 ⏰",
+        '03': "03:00 ⏰",
+        '08': "08:00 ⏰",
+        '12': "12:00 ⏰",
+        '18': "18:00 ⏰",
+        '21': "21:00 ⏰",
+        'off': "Desactivado 🚫"
+      }
+    },
+    'confirm_tone': "✅ Tono actualizado a:",
+    'confirm_length': "✅ Longitud actualizada a:",
+    'confirm_language': "✅ Idioma actualizado a:",
+    'confirm_include_names': "✅ Incluir nombres:",
+    'confirm_daily_hour': "✅ Resumen diario programado a las",
+    'confirm_daily_off': "✅ Resumen diario desactivado",
+    'back_button': "↩ Volver",
+    'invalid_option': "⚠️ Opción inválida.",
+    'error_db': "❌ Error guardando la configuración en BD."
+  },
+  'en': {
+    'title_main': "⚙️ Current summary settings for this chat:",
+    'tone_button': "🧠 Tone",
+    'buttons': {
+      'tone': {
+        'neutral': "Neutral 🧾",
+        'informal': "Informal 🙂",
+        'sarcastic': "Sarcastic 😈",
+        'ironic': "Ironic 🙃",
+        'absurd': "Absurd 🤪"
+      },
+      'length': {
+        'short': "Short ✂️",
+        'medium': "Medium 📏",
+        'long': "Long 📚"
+      },
+      'language': {
+        'es': "Spanish 🇪🇸",
+        'en': "English 🇬🇧",
+        'fr': "French 🇫🇷",
+        'pt': "Portuguese 🇵🇹"
+      },
+      'include_names': {
+        'true': "Yes 🧍",
+        'false': "No 🚫"
+      },
+      'daily_summary_hour': {
+        '00': "00:00 ⏰",
+        '03': "03:00 ⏰",
+        '08': "08:00 ⏰",
+        '12': "12:00 ⏰",
+        '18': "18:00 ⏰",
+        '21': "21:00 ⏰",
+        'off': "Off 🚫"
+      }
+    },
+    'confirm_tone': "✅ Tone updated to:",
+    'confirm_length': "✅ Length updated to:",
+    'confirm_language': "✅ Language updated to:",
+    'confirm_include_names': "✅ Include names:",
+    'confirm_daily_hour': "✅ Daily summary set at",
+    'confirm_daily_off': "✅ Daily summary disabled",
+    'back_button': "↩ Back",
+    'invalid_option': "⚠️ Invalid option.",
+    'error_db': "❌ Error saving configuration to DB."
+  }
+  # (Opcionalmente incorporar 'fr' y 'pt' en entregas posteriores)
+}
+```
+
+## C. Ejemplo de Prompt Dinámico
+
+### Parámetros
+
+* `tone = 'sarcastic'`
+* `length = 'medium'`
+* `language = 'es'`
+* `include_names = True`
+
+### Prompt Resultante
+
+```
+Eres un asistente que resume conversaciones con un tono sarcástico y divertido.
+Tu tarea es generar un resumen de longitud media (5–7 frases), manteniendo los nombres
+de los participantes cuando sea posible. Mantén toda la respuesta en español.
+Menciona quién dijo qué, destaca lo absurdo o gracioso y presenta los puntos clave
+de forma clara pero irónica.
+```
+
+## D. Investigación y Notas Adicionales
+
+* **Zona Horaria**: APScheduler usa `pytz.timezone("Europe/Madrid")` para CET/CEST automático.
+* **Límites de Mensajes para Resumen de Chat**: Debe haber al menos 5 mensajes recientes; de lo contrario, devolver “No hay suficientes mensajes para resumir…”.
+* **Tamaño Máximo de Archivo (20 MB)**: Se recuerda en handlers de multimedia, pero no afecta directamente a la configuración.
+* **Dependencias Críticas**:
+
+  * `python-telegram-bot`
+  * `aiosqlite`
+  * `openai` (para OpenRouter y Whisper)
+  * `APScheduler`
+  * `pytz`
+  * `ffmpeg` (para audio/video, en configuraciones previas)
+
+</PRD>

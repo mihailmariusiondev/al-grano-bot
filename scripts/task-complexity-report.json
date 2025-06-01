@@ -1,0 +1,93 @@
+{
+  "meta": {
+    "generatedAt": "2025-06-01T13:21:18.172Z",
+    "tasksAnalyzed": 10,
+    "totalTasks": 10,
+    "analysisCount": 10,
+    "thresholdScore": 5,
+    "projectName": "Taskmaster",
+    "usedResearch": true
+  },
+  "complexityAnalysis": [
+    {
+      "taskId": 1,
+      "taskTitle": "Create chat_summary_config Database Table",
+      "complexityScore": 4,
+      "recommendedSubtasks": 3,
+      "expansionPrompt": "Break down the database table creation task into subtasks for: 1) implementing the SQL schema in database_service.py, 2) creating the migration logic to transfer existing configuration, and 3) implementing the required database access methods.",
+      "reasoning": "This task involves database schema creation, data migration, and implementing access methods. The SQL is already provided and the operations are straightforward, but there are multiple components that should be tested independently."
+    },
+    {
+      "taskId": 2,
+      "taskTitle": "Define Localization Constants and Labels",
+      "complexityScore": 5,
+      "recommendedSubtasks": 4,
+      "expansionPrompt": "Break down the localization constants task into subtasks for: 1) creating the Spanish labels dictionary, 2) creating the English labels dictionary, 3) implementing the helper functions for label retrieval, and 4) writing comprehensive tests for the localization system.",
+      "reasoning": "This task requires creating a comprehensive dictionary structure with multiple nested levels for different languages. The complexity comes from ensuring all required keys exist across languages and implementing helper functions that handle fallbacks correctly."
+    },
+    {
+      "taskId": 3,
+      "taskTitle": "Implement /configurar_resumen Command",
+      "complexityScore": 6,
+      "recommendedSubtasks": 3,
+      "expansionPrompt": "Break down the command implementation task into subtasks for: 1) creating the main command handler function, 2) implementing the message formatting logic with current settings display, and 3) implementing the inline keyboard generation with proper callback data.",
+      "reasoning": "This task involves creating a complex UI with inline keyboards and formatting messages based on user configuration. It requires handling both new messages and edits, and depends on other components being completed first."
+    },
+    {
+      "taskId": 4,
+      "taskTitle": "Implement Configuration Callback Handler",
+      "complexityScore": 8,
+      "recommendedSubtasks": 5,
+      "expansionPrompt": "Break down the callback handler implementation into subtasks for: 1) creating the main callback handler function, 2) implementing the submenu display logic, 3) implementing value selection and database updates, 4) adding permission validation for group chats, and 5) implementing navigation between menus.",
+      "reasoning": "This is one of the most complex tasks as it involves handling multiple types of user interactions, submenus, permission checks, database updates, and special handling for different configuration fields. The callback handler needs to parse complex callback data and manage state transitions."
+    },
+    {
+      "taskId": 5,
+      "taskTitle": "Create Dynamic Summary Prompt Generator",
+      "complexityScore": 5,
+      "recommendedSubtasks": 3,
+      "expansionPrompt": "Break down the prompt generator task into subtasks for: 1) implementing the core prompt generation function with language and tone variations, 2) integrating with the OpenAI service, and 3) creating comprehensive tests for different configuration combinations.",
+      "reasoning": "This task requires creating a complex function that generates different prompts based on multiple parameters. It involves handling multiple languages and tone variations, with specific text for each combination."
+    },
+    {
+      "taskId": 6,
+      "taskTitle": "Implement Scheduler Service for Daily Summaries",
+      "complexityScore": 7,
+      "recommendedSubtasks": 4,
+      "expansionPrompt": "Break down the scheduler service implementation into subtasks for: 1) creating the core scheduler functionality with job management, 2) implementing the daily summary generation and sending logic, 3) adding integration with the bot startup/shutdown process, and 4) implementing error handling and cleanup for inaccessible chats.",
+      "reasoning": "This task involves working with an external scheduler library, managing cron triggers with timezone handling, and implementing job lifecycle management. It also requires integration with other services and proper error handling for various failure scenarios."
+    },
+    {
+      "taskId": 7,
+      "taskTitle": "Update /summarize Command to Use Custom Configuration",
+      "complexityScore": 5,
+      "recommendedSubtasks": 3,
+      "expansionPrompt": "Break down the command update task into subtasks for: 1) modifying the existing command to retrieve and use custom configuration, 2) implementing error handling for various failure scenarios, and 3) ensuring backward compatibility with the reply-based summarization.",
+      "reasoning": "This task involves modifying an existing command to use the new configuration system while maintaining compatibility with existing functionality. It requires careful error handling and integration with multiple services."
+    },
+    {
+      "taskId": 8,
+      "taskTitle": "Remove Obsolete Commands and Update Help",
+      "complexityScore": 3,
+      "recommendedSubtasks": 3,
+      "expansionPrompt": "Break down the cleanup task into subtasks for: 1) removing obsolete command files and references, 2) updating the help command with new information, and 3) implementing fallback handlers for removed commands.",
+      "reasoning": "This is a relatively straightforward cleanup task that involves removing obsolete code, updating documentation, and adding fallback handlers. The main complexity is ensuring all references to old commands are removed consistently."
+    },
+    {
+      "taskId": 9,
+      "taskTitle": "Implement Database Service Extensions",
+      "complexityScore": 5,
+      "recommendedSubtasks": 3,
+      "expansionPrompt": "Break down the database service extensions task into subtasks for: 1) implementing the method to retrieve all daily summary configurations, 2) implementing the method to retrieve recent messages with filtering options, and 3) creating the message formatting utility for summaries.",
+      "reasoning": "This task involves implementing database queries with joins and filtering options, as well as creating utility functions for formatting messages. The SQL queries are moderately complex with multiple conditions and parameters."
+    },
+    {
+      "taskId": 10,
+      "taskTitle": "Implement Message Service for Daily Summaries",
+      "complexityScore": 4,
+      "recommendedSubtasks": 2,
+      "expansionPrompt": "Break down the message service implementation into subtasks for: 1) creating the core message sending functionality with error handling, and 2) implementing the long message splitting and sending logic.",
+      "reasoning": "This task involves creating utility functions for sending messages with error handling and support for long messages. The logic is relatively straightforward but requires careful handling of Telegram API limitations and errors."
+    }
+  ]
+}

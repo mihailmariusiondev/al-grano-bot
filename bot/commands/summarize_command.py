@@ -164,18 +164,29 @@ async def summarize_command(update: Update, context: CallbackContext):
                 return
             await update_progress(wait_message, PROGRESS_MESSAGES["FORMATTING"])
             formatted_messages = format_recent_messages(recent_messages)
-            chat_state_db = await db_service.get_chat_state(chat_id)
-            summary_style = (
-                "chat_long"
-                if chat_state_db.get("summary_type", "long") == "long"
-                else "chat_short"
-            )
+
+            # Get chat configuration for custom summary
+            config = await db_service.get_chat_summary_config(chat_id)
+
             await update_progress(wait_message, PROGRESS_MESSAGES["SUMMARIZING"])
-            summary = await openai_service.get_summary(
-                content=formatted_messages,
-                summary_type=summary_style, # This is 'chat_long' or 'chat_short', not from SUMMARY_PROMPTS directly
-                language="Spanish",
-            )
+            try:
+                summary = await openai_service.get_summary(
+                    content=formatted_messages,
+                    summary_type="chat_custom",
+                    language=config['language'],
+                    tone=config['tone'],
+                    length=config['length'],
+                    include_names=config['include_names']
+                )
+            except ValueError as e:
+                # Handle unsupported language
+                if "is not supported" in str(e):
+                    await wait_message.edit_text(f"Error: {str(e)}. Por favor, configura un idioma soportado con /configurar_resumen.")
+                    return
+                else:
+                    await wait_message.edit_text(f"Error al generar el resumen: {str(e)}")
+                    return
+
             await update_progress(wait_message, PROGRESS_MESSAGES["FINALIZING"])
             await send_long_message(update, summary)
         else:

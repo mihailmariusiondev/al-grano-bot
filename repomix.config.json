@@ -11,7 +11,16 @@
   "ignore": {
     "useGitignore": true,
     "useDefaultPatterns": true,
-    "customPatterns": [".gitignore", "repomix.config.json", ".cursorrules", "prompts", "LICENSE"]
+    "customPatterns": [
+      ".gitignore",
+      "repomix.config.json",
+      ".cursorrules",
+      "prompts",
+      "LICENSE",
+      ".cursor",
+      ".taskmasterconfig",
+      "cline_mcp_settings.json"
+    ]
   },
   "security": {
     "enableSecurityCheck": true

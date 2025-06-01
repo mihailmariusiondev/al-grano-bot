@@ -3,6 +3,7 @@ from telegram.ext import (
     ApplicationBuilder,
     CommandHandler,
     MessageHandler,
+    CallbackQueryHandler,
     filters,
 )
 from typing import Optional
@@ -10,18 +11,26 @@ from bot.commands import (
     start_command,
     help_command,
     summarize_command,
-    toggle_daily_summary_command,
-    toggle_summary_type_command,
+    configure_summary_command,
 )
 from bot.handlers import (
     error_handler,
     message_handler,
 )
+from bot.callbacks import configure_summary_callback
 from bot.utils.logger import logger
 from bot.services.database_service import db_service
 from bot.services.scheduler_service import scheduler_service
 from bot.services.message_service import message_service
+from telegram import Update
+from telegram.ext import ContextTypes
 import asyncio
+
+async def obsolete_command_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle obsolete commands by redirecting to the new configuration command."""
+    await update.message.reply_text(
+        "Este comando ya no existe. Usa /configurar_resumen para personalizar los resúmenes."
+    )
 
 class TelegramBot:
     _instance = None
@@ -68,11 +77,12 @@ class TelegramBot:
         self.application.add_handler(CommandHandler("start", start_command))
         self.application.add_handler(CommandHandler("help", help_command))
         self.application.add_handler(CommandHandler("summarize", summarize_command))
+        self.application.add_handler(CommandHandler("configurar_resumen", configure_summary_command))
+        # Obsolete command handlers
+        self.application.add_handler(CommandHandler("toggle_daily_summary", obsolete_command_handler))
+        self.application.add_handler(CommandHandler("toggle_summary_type", obsolete_command_handler))
         self.application.add_handler(
-            CommandHandler("toggle_daily_summary", toggle_daily_summary_command)
-        )
-        self.application.add_handler(
-            CommandHandler("toggle_summary_type", toggle_summary_type_command)
+            CallbackQueryHandler(configure_summary_callback, pattern=r'^cfg\|')
         )
         self.application.add_handler(
             MessageHandler(filters.TEXT & ~filters.COMMAND, message_handler)
@@ -83,7 +93,7 @@ class TelegramBot:
     async def _start_scheduler(self):
         """Start scheduler in the running event loop"""
         try:
-            scheduler_service.start()
+            await scheduler_service.start()
             self.logger.info("Scheduler started successfully")
         except Exception as e:
             self.logger.error(f"Failed to start scheduler: {e}", exc_info=True)

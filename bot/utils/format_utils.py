@@ -3,6 +3,7 @@ from typing import List, Dict
 from telegram import Update
 from telegram.constants import MessageLimit
 from bot.utils.constants import PAUSE_BETWEEN_CHUNKS
+from bot.services.message_service import message_service
 import asyncio
 
 
@@ -33,13 +34,29 @@ def format_recent_messages(recent_messages: List[Dict]) -> str:
 
 
 async def send_long_message(update: Update, text: str) -> None:
-    """Split and send long messages respecting Telegram's limits"""
-    chunks = [
-        text[i : i + MessageLimit.MAX_TEXT_LENGTH]
-        for i in range(0, len(text), MessageLimit.MAX_TEXT_LENGTH)
-    ]
+    """Split and send long messages respecting Telegram's limits
 
-    for chunk in chunks:
-        await update.message.reply_text(chunk)
-        if len(chunks) > 1:
-            await asyncio.sleep(PAUSE_BETWEEN_CHUNKS)
+    This function maintains backward compatibility with the existing interface
+    while leveraging the improved message_service functionality.
+    """
+    chat_id = update.effective_chat.id
+
+    # Use the improved message_service which handles long messages automatically
+    success = await message_service.send_message(chat_id, text)
+
+    if not success:
+        # Fallback to basic reply if message_service fails
+        logging.warning(f"Message service failed for chat {chat_id}, using fallback")
+        try:
+            chunks = [
+                text[i : i + MessageLimit.MAX_TEXT_LENGTH]
+                for i in range(0, len(text), MessageLimit.MAX_TEXT_LENGTH)
+            ]
+
+            for chunk in chunks:
+                await update.message.reply_text(chunk)
+                if len(chunks) > 1:
+                    await asyncio.sleep(PAUSE_BETWEEN_CHUNKS)
+        except Exception as e:
+            logging.error(f"Fallback also failed for chat {chat_id}: {e}")
+            raise
