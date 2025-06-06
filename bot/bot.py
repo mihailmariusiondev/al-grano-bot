@@ -12,6 +12,7 @@ from bot.commands import (
     summarize_command,
     toggle_daily_summary_command,
     toggle_summary_type_command,
+    export_chat_command,
 )
 from bot.handlers import (
     error_handler,
@@ -74,6 +75,7 @@ class TelegramBot:
         self.application.add_handler(
             CommandHandler("toggle_summary_type", toggle_summary_type_command)
         )
+        self.application.add_handler(CommandHandler("export_chat", export_chat_command))
         self.application.add_handler(
             MessageHandler(filters.TEXT & ~filters.COMMAND, message_handler)
         )
