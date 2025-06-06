@@ -9,7 +9,7 @@ from bot.utils.decorators import log_command, bot_started
 from bot.services.database_service import db_service
 from bot.utils.logger import logger
 
-logger = logger.get_logger(__name__)
+log = logger.get_logger(__name__)
 
 
 @log_command()
@@ -66,6 +66,6 @@ async def export_chat_command(update: Update, context: ContextTypes.DEFAULT_TYPE
 
         os.remove(tmp_path)
     except Exception as e:
-        logger.error(f"Error in export_chat_command: {e}", exc_info=True)
+        log.error(f"Error in export_chat_command: {e}", exc_info=True)
         await update.message.reply_text("❌ Error al exportar el chat.")
         raise
