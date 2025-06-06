@@ -28,7 +28,8 @@ async def export_chat_command(update: Update, context: ContextTypes.DEFAULT_TYPE
 
         entries = []
         for msg in messages:
-            created = datetime.fromisoformat(msg["created_at"]).astimezone(madrid_tz)
+            created_utc = datetime.fromisoformat(msg["created_at"]).replace(tzinfo=pytz.UTC)
+            created = created_utc.astimezone(madrid_tz)
             timestamp = created.strftime("%Y-%m-%d %H:%M")
             username = (
                 msg.get("username")
@@ -57,14 +58,15 @@ async def export_chat_command(update: Update, context: ContextTypes.DEFAULT_TYPE
             json.dump(entries, tmp, ensure_ascii=False, indent=2)
             tmp_path = tmp.name
 
-        with open(tmp_path, "rb") as doc:
-            await context.bot.send_document(
-                chat_id=chat_id,
-                document=doc,
-                filename="chat_export.json",
-            )
-
-        os.remove(tmp_path)
+        try:
+            with open(tmp_path, "rb") as doc:
+                await context.bot.send_document(
+                    chat_id=chat_id,
+                    document=doc,
+                    filename="chat_export.json",
+                )
+        finally:
+            os.remove(tmp_path)
     except Exception as e:
         log.error(f"Error in export_chat_command: {e}", exc_info=True)
         await update.message.reply_text("❌ Error al exportar el chat.")
