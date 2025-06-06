@@ -1,4 +1,6 @@
 import aiosqlite
+from datetime import datetime
+import pytz
 from typing import Optional, List, Dict
 from bot.utils.constants import MAX_RECENT_MESSAGES
 from ..utils.logger import logger
@@ -244,6 +246,40 @@ class DatabaseService:
             return messages
         except Exception as e:
             self.logger.error(f"Error getting recent messages: {e}")
+            raise
+
+    async def get_messages_for_date(self, chat_id: int, date) -> List[Dict]:
+        """Get all messages for a specific date (00:00 - 23:59)"""
+        try:
+            madrid_tz = pytz.timezone("Europe/Madrid")
+            day_start = datetime(
+                date.year, date.month, date.day, 0, 0, 0, tzinfo=madrid_tz
+            )
+            day_end = day_start.replace(
+                hour=23, minute=59, second=59, microsecond=999999
+            )
+
+            day_start_utc = day_start.astimezone(pytz.UTC)
+            day_end_utc = day_end.astimezone(pytz.UTC)
+
+            query = """
+                SELECT m.message_text, m.created_at, m.telegram_message_id,
+                       m.telegram_reply_to_message_id,
+                       u.user_id, u.first_name, u.last_name, u.username
+                FROM telegram_message m
+                JOIN telegram_user u ON m.user_id = u.user_id
+                WHERE m.chat_id = ?
+                AND m.created_at BETWEEN ? AND ?
+                ORDER BY m.telegram_message_id ASC
+            """
+
+            messages = await self.fetch_all(
+                query,
+                (chat_id, day_start_utc.isoformat(), day_end_utc.isoformat()),
+            )
+            return messages
+        except Exception as e:
+            self.logger.error(f"Error getting messages for date: {e}", exc_info=True)
             raise
 
     async def save_message(
