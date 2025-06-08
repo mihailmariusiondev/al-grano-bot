@@ -34,8 +34,7 @@ class Logger:
             log_level_name = os.getenv('LOG_LEVEL', 'INFO').upper()
             self.log_level = getattr(logging, log_level_name, logging.INFO)
 
-            # DEBUG_MODE ya no fuerza el nivel - se respeta LOG_LEVEL
-            debug_mode = os.getenv('DEBUG_MODE', 'false').lower() == 'true'
+            # Solo se usa LOG_LEVEL para configurar el nivel de logging
 
             # Configurar el root logger con el nivel apropiado
             root_logger = logging.getLogger()
@@ -70,7 +69,6 @@ class Logger:
             root_logger.info(f"=== LOGGING SYSTEM INITIALIZED ===")
             root_logger.info(f"Log level: {log_level_name} ({self.log_level})")
             root_logger.info(f"Log directory: {self.log_dir}")
-            root_logger.info(f"Debug mode: {debug_mode}")
             root_logger.info(f"Respecting LOG_LEVEL environment variable: {log_level_name}")
 
         except Exception as e:

@@ -41,7 +41,6 @@
   - `OPENROUTER_API_KEY`: Clave para la API de OpenRouter (para LLMs de resumen).
   - `OPENAI_API_KEY_FOR_WHISPER`: Clave de la API de OpenAI (exclusivamente para transcripciones con Whisper).
   - `DB_PATH` (opcional, por defecto `bot.db`).
-  - `DEBUG_MODE` (opcional, por defecto `false`).
   - `LOG_LEVEL` (opcional, por defecto `INFO`).
   - `AUTO_ADMIN_USER_IDS_CSV` (opcional, IDs de usuario de Telegram separados por comas para ser administradores automáticamente).
 - Dependencias listadas en `environment.yml` deben estar instaladas.

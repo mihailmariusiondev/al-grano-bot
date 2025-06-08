@@ -55,13 +55,14 @@ def main():
         load_dotenv(override=True)
         config.load_from_env() # Carga toda la configuración, incluidas las nuevas claves y URLs
 
-        # --- AÑADE ESTAS LÍNEAS PARA DEPURAR ---
-        print("="*30)
-        print("DEPURACIÓN DE CONFIGURACIÓN DE LOGS")
-        print(f"LOG_LEVEL desde .env: {os.getenv('LOG_LEVEL')}")
-        print(f"Nivel de log del logger raíz: {logging.getLevelName(logging.getLogger().level)}")
-        print("="*30)
-        # --- FIN DE LAS LÍNEAS DE DEPURACIÓN ---
+        # FORZAR REINICIALIZACIÓN DEL LOGGER DESPUÉS DE CARGAR .ENV
+        from bot.utils.logger import Logger
+        logger_instance = Logger()
+        logger_instance._init_logger()  # Reinicializar con las nuevas variables de entorno
+
+        # Recrear el logger específico con la nueva configuración
+        global logger
+        logger = logger_instance.get_logger(__name__)
 
         if not config.BOT_TOKEN:
             raise ValueError("BOT_TOKEN environment variable is not set")
