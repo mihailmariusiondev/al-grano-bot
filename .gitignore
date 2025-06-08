@@ -168,3 +168,4 @@ tasks/
 .cline_mcp_settings.json
 cline_mcp_settings.json
 .cursor/mcp.json
+pr-diff.md
