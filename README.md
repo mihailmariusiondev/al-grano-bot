@@ -31,7 +31,7 @@
   - Mensajes de ayuda detallados accesibles con `/help`.
   - Exporta los mensajes del día en un archivo JSON con `/export_chat`.
 - **Administración del Bot**:
-  - Comandos específicos para administradores (`/toggle_daily_summary`, `/toggle_summary_type`).
+  - Interfaz de configuración `/configurar_resumen` con permisos administrativos para cambiar configuraciones del chat.
   - Los administradores pueden ser definidos automáticamente a través de una variable de entorno.
 - **Persistencia de Datos**:
   - Almacena mensajes (para resúmenes de chat), estados de chat y datos de usuario (para gestión de límites) en una base de datos SQLite.
@@ -125,8 +125,7 @@
       - **Respondiendo a un mensaje (Operación Simple o Avanzada)**:
         - **Texto simple, enlaces a YouTube, artículos web**: _Cooldown: 2 minutos para usuarios no admins._
         - **Archivos de Audio/Voz, Vídeos/Notas de Vídeo, Documentos (PDF, DOCX, TXT)**: Considerado "Operación Avanzada". _Cooldown: 10 minutos y límite de 5 operaciones/día para usuarios no admins._
-    - `/toggle_daily_summary` (Solo Admins): Activa o desactiva el resumen diario automático del chat (se envía a las 3 AM hora de Madrid).
-    - `/toggle_summary_type` (Solo Admins): Alterna entre resúmenes de chat largos (detallados) y cortos (concisos).
+    - `/configurar_resumen`: Personaliza la configuración de resúmenes (tono, longitud, idioma, inclusión de nombres, resúmenes diarios automáticos). Los administradores pueden cambiar la configuración del chat.
     - `/export_chat`: Envía un archivo `.json` con los mensajes del día en curso.
 
     **Nota sobre límites (para usuarios no administradores):**

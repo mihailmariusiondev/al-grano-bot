@@ -12,6 +12,7 @@ from bot.commands import (
     help_command,
     summarize_command,
     configure_summary_command,
+    export_chat_command,
 )
 from bot.handlers import (
     error_handler,
@@ -82,6 +83,7 @@ class TelegramBot:
         self.application.add_handler(CommandHandler("help", help_command))
         self.application.add_handler(CommandHandler("summarize", summarize_command))
         self.application.add_handler(CommandHandler("configurar_resumen", configure_summary_command))
+        self.application.add_handler(CommandHandler("export_chat", export_chat_command))
         self.logger.debug("Core command handlers registered")
 
         # Obsolete command handlers
