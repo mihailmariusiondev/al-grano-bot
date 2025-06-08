@@ -13,7 +13,7 @@ class Logger:
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super().__new__(cls)
-            cls._instance.log_level = logging.DEBUG
+            cls._instance.log_level = logging.INFO
             cls._instance.log_dir = None
             cls._instance.log_format = "%(asctime)s - %(name)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(funcName)s() - %(message)s"
             cls._instance.max_file_size = 20 * 1024 * 1024
@@ -30,13 +30,12 @@ class Logger:
             self.log_dir = Path("logs")
             self.log_dir.mkdir(parents=True, exist_ok=True)
 
-            # Obtener nivel de log de variable de entorno, por defecto DEBUG
-            log_level_name = os.getenv('LOG_LEVEL', 'DEBUG').upper()
-            self.log_level = getattr(logging, log_level_name, logging.DEBUG)
+            # Obtener nivel de log de variable de entorno, por defecto INFO
+            log_level_name = os.getenv('LOG_LEVEL', 'INFO').upper()
+            self.log_level = getattr(logging, log_level_name, logging.INFO)
 
-            # Si DEBUG_MODE está activo, forzar nivel DEBUG
-            if os.getenv('DEBUG_MODE', 'true').lower() == 'true':
-                self.log_level = logging.DEBUG
+            # DEBUG_MODE ya no fuerza el nivel - se respeta LOG_LEVEL
+            debug_mode = os.getenv('DEBUG_MODE', 'false').lower() == 'true'
 
             # Configurar el root logger con el nivel apropiado
             root_logger = logging.getLogger()
@@ -71,8 +70,9 @@ class Logger:
             root_logger.info(f"=== LOGGING SYSTEM INITIALIZED ===")
             root_logger.info(f"Log level: {log_level_name} ({self.log_level})")
             root_logger.info(f"Log directory: {self.log_dir}")
-            root_logger.info(f"Debug mode: {os.getenv('DEBUG_MODE', 'true')}")
+            root_logger.info(f"Debug mode: {debug_mode}")
             root_logger.info(f"Environment: {os.getenv('ENVIRONMENT', 'development')}")
+            root_logger.info(f"Respecting LOG_LEVEL environment variable: {log_level_name}")
 
         except Exception as e:
             print(f"Error initializing logger: {e}")
