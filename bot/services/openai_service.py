@@ -4,7 +4,11 @@ import asyncio
 from bot.utils.text_utils import chunk_text
 from bot.utils.logger import logger
 from bot.prompts.base_prompts import BASE_PROMPTS
-from bot.prompts.prompt_modifiers import generate_chat_modifiers
+from bot.prompts.prompt_modifiers import (
+    generate_tone_modifier,
+    generate_length_modifier,
+    generate_names_modifier,
+)
 from bot.config import config # Import config para acceder a los nombres de modelo y URLs
 
 # SummaryType Literal, debe coincidir con las claves en ALL_SUMMARY_PROMPTS
@@ -142,36 +146,49 @@ class OpenAIService:
         if not self.initialized:
             raise RuntimeError("OpenAI service not initialized")
 
-        language = config.get('language', 'es')
-        # Map language codes to full names for the prompt
+        # 1. Obtener la plantilla base
+        base_template = BASE_PROMPTS.get(summary_type)
+        if not base_template:
+            raise ValueError(f"Unsupported summary type: {summary_type}")
+
+        # 2. Preparar los posibles modificadores basados en la configuración
+        modifiers = {
+            "tone_instruction": generate_tone_modifier(config.get('tone', 'neutral')),
+            "length_instruction": generate_length_modifier(config.get('length', 'medium')),
+            "names_instruction": generate_names_modifier(config.get('include_names', True)),
+        }
+
+        # 3. Construir el prompt final rellenando la plantilla
+        # Usamos un bucle para reemplazar solo los placeholders que existen en la plantilla.
+        # Esto evita errores si una plantilla no tiene un placeholder como {tone_instruction}.
+        final_prompt = base_template
+        for key, value in modifiers.items():
+            placeholder = f"{{{key}}}"
+            if placeholder in final_prompt:
+                final_prompt = final_prompt.replace(placeholder, value)
+
+        # Limpiar placeholders no utilizados (si los hubiera)
+        import re
+        final_prompt = re.sub(r'\{[a-z_]+_instruction\}', '', final_prompt)
+
+        # 4. Añadir la instrucción final de idioma
         language_map = {'es': 'Spanish', 'en': 'English', 'fr': 'French', 'pt': 'Portuguese'}
-        output_language = language_map.get(language, 'Spanish')
+        output_language = language_map.get(config.get('language', 'es'), 'Spanish')
+        final_prompt += f"\n\nIMPORTANT: The entire output response must be written in {output_language}."
+
+        self.logger.debug(f"Final System Prompt for type '{summary_type}':\n{final_prompt}")
+
+        # 5. Llamar a la API de OpenAI
+        messages = [
+            {"role": "system", "content": final_prompt.strip()},
+            {"role": "user", "content": content},
+        ]
+
+        # Usar el modelo primario por defecto
+        model = config.get("model", config.OPENROUTER_PRIMARY_MODEL) # Assuming config.OPENROUTER_PRIMARY_MODEL is the default model
 
         try:
-            # 1. Get the base prompt in English
-            base_prompt = BASE_PROMPTS.get(summary_type)
-            if not base_prompt:
-                self.logger.error(f"No base prompt found for summary_type: {summary_type}")
-                raise ValueError(f"Unsupported summary type: {summary_type}")
-
-            prompt_parts = [base_prompt.strip()]
-
-            # 2. Add modifiers ONLY for chat summaries
-            if summary_type == "chat":
-                chat_modifiers = generate_chat_modifiers(config)
-                prompt_parts.append(chat_modifiers)
-
-            # 3. Add the final language instruction
-            prompt_parts.append(f"\nIMPORTANT: The entire output response must be written in {output_language}.")
-
-            system_prompt_string = "\n".join(prompt_parts)
-            self.logger.debug(f"Final System Prompt for type '{summary_type}':\n{system_prompt_string}")
-
-            messages = [
-                {"role": "system", "content": system_prompt_string},
-                {"role": "user", "content": content},
-            ]
-            return await self.chat_completion_openrouter(messages, model=config.get("model", config.OPENROUTER_PRIMARY_MODEL))
+            return await self.chat_completion_openrouter(messages, model=model)
         except Exception as e:
             self.logger.error(f"Summary generation failed for type {summary_type}: {e}", exc_info=True)
             raise
