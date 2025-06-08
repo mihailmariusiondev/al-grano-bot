@@ -1,17 +1,15 @@
 import openai
-from typing import List, Optional, Dict, Literal, Callable
+from typing import List, Optional, Dict, Literal
 import asyncio
 from bot.utils.text_utils import chunk_text
 from bot.utils.logger import logger
-from bot.prompts import ALL_SUMMARY_PROMPTS
-from bot.prompts.custom_chat_prompts import get_summary_prompt
+from bot.prompts.base_prompts import BASE_PROMPTS
+from bot.prompts.prompt_modifiers import generate_chat_modifiers
 from bot.config import config # Import config para acceder a los nombres de modelo y URLs
 
 # SummaryType Literal, debe coincidir con las claves en ALL_SUMMARY_PROMPTS
 SummaryType = Literal[
-    "chat_long",
-    "chat_short",
-    "chat_custom",
+    "chat",
     "youtube",
     "telegram_video",
     "voice_message",
@@ -140,50 +138,40 @@ class OpenAIService:
             self.logger.error(f"Audio transcription failed: {e}", exc_info=True)
             raise RuntimeError(f"Failed to transcribe audio: {str(e)}") from e
 
-    async def get_summary(
-        self,
-        content: str,
-        summary_type: SummaryType,
-        language: str = "Spanish",
-        model: str = config.OPENROUTER_PRIMARY_MODEL,
-        **kwargs
-    ) -> str:
+    async def get_summary(self, content: str, summary_type: SummaryType, config: Dict) -> str:
         if not self.initialized:
             raise RuntimeError("OpenAI service not initialized")
+
+        language = config.get('language', 'es')
+        # Map language codes to full names for the prompt
+        language_map = {'es': 'Spanish', 'en': 'English', 'fr': 'French', 'pt': 'Portuguese'}
+        output_language = language_map.get(language, 'Spanish')
+
         try:
-            # Handle custom chat prompts
-            if summary_type == "chat_custom":
-                # Extract custom parameters from kwargs
-                tone = kwargs.get('tone', 'neutral')
-                length = kwargs.get('length', 'medium')
-                include_names = kwargs.get('include_names', True)
+            # 1. Get the base prompt in English
+            base_prompt = BASE_PROMPTS.get(summary_type)
+            if not base_prompt:
+                self.logger.error(f"No base prompt found for summary_type: {summary_type}")
+                raise ValueError(f"Unsupported summary type: {summary_type}")
 
-                # Convert language format if needed (Spanish -> es)
-                lang_code = language.lower()
-                if lang_code in ['spanish', 'español']:
-                    lang_code = 'es'
-                elif lang_code in ['english', 'inglés']:
-                    lang_code = 'en'
-                elif lang_code in ['french', 'français', 'francés']:
-                    lang_code = 'fr'
-                elif lang_code in ['portuguese', 'português', 'portugués']:
-                    lang_code = 'pt'
+            prompt_parts = [base_prompt.strip()]
 
-                system_prompt_string = get_summary_prompt(tone, length, lang_code, include_names)
-                self.logger.debug(f"Generated custom chat prompt for tone={tone}, length={length}, language={lang_code}, include_names={include_names}")
-            else:
-                # Use existing prompt templates for other summary types
-                prompt_function: Optional[Callable[[str, str], str]] = ALL_SUMMARY_PROMPTS.get(summary_type)
-                if prompt_function is None:
-                    self.logger.error(f"Invalid summary_type or no prompt function found: {summary_type}")
-                    raise ValueError(f"Unsupported summary type: {summary_type}")
-                system_prompt_string = prompt_function(language, content)
+            # 2. Add modifiers ONLY for chat summaries
+            if summary_type == "chat":
+                chat_modifiers = generate_chat_modifiers(config)
+                prompt_parts.append(chat_modifiers)
+
+            # 3. Add the final language instruction
+            prompt_parts.append(f"\nIMPORTANT: The entire output response must be written in {output_language}.")
+
+            system_prompt_string = "\n".join(prompt_parts)
+            self.logger.debug(f"Final System Prompt for type '{summary_type}':\n{system_prompt_string}")
 
             messages = [
                 {"role": "system", "content": system_prompt_string},
                 {"role": "user", "content": content},
             ]
-            return await self.chat_completion_openrouter(messages, model=model)
+            return await self.chat_completion_openrouter(messages, model=config.get("model", config.OPENROUTER_PRIMARY_MODEL))
         except Exception as e:
             self.logger.error(f"Summary generation failed for type {summary_type}: {e}", exc_info=True)
             raise

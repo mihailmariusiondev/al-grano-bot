@@ -165,18 +165,13 @@ async def summarize_command(update: Update, context: CallbackContext):
             await update_progress(wait_message, PROGRESS_MESSAGES["FORMATTING"])
             formatted_messages = format_recent_messages(recent_messages)
 
-            # Get chat configuration for custom summary
-            config = await db_service.get_chat_summary_config(chat_id)
-
+            chat_config = await db_service.get_chat_summary_config(chat_id)
             await update_progress(wait_message, PROGRESS_MESSAGES["SUMMARIZING"])
             try:
                 summary = await openai_service.get_summary(
                     content=formatted_messages,
-                    summary_type="chat_custom",
-                    language=config['language'],
-                    tone=config['tone'],
-                    length=config['length'],
-                    include_names=config['include_names']
+                    summary_type="chat",
+                    config=chat_config
                 )
             except ValueError as e:
                 # Handle unsupported language
@@ -193,7 +188,7 @@ async def summarize_command(update: Update, context: CallbackContext):
             reply_msg = update.message.reply_to_message
             message_type_for_handler = get_message_type(reply_msg)
             content_for_summary = None
-            summary_type_for_openai = None
+            summary_type = None # Renamed from summary_type_for_openai
             try:
                 match message_type_for_handler:
                     case "text":
@@ -202,42 +197,42 @@ async def summarize_command(update: Update, context: CallbackContext):
                         if YOUTUBE_REGEX.search(text):
                             await update_progress(wait_message, PROGRESS_MESSAGES["DOWNLOADING"])
                             content_for_summary = await youtube_handler(update, context, text)
-                            summary_type_for_openai = "youtube"
+                            summary_type = "youtube"
                         elif ARTICLE_URL_REGEX.search(text):
                             await update_progress(wait_message, PROGRESS_MESSAGES["DOWNLOADING"])
                             content_for_summary = await article_handler(text)
-                            summary_type_for_openai = "web_article"
+                            summary_type = "web_article"
                         else:
                             content_for_summary = text
-                            summary_type_for_openai = "quoted_message"
+                            summary_type = "quoted_message"
                     case "voice" | "audio":
                         await update_progress(wait_message, PROGRESS_MESSAGES["DOWNLOADING"])
                         await update_progress(wait_message, PROGRESS_MESSAGES["TRANSCRIBING"])
                         content_for_summary = await audio_handler(reply_msg, context)
-                        summary_type_for_openai = "voice_message" if message_type_for_handler == "voice" else "audio_file"
+                        summary_type = "voice_message" if message_type_for_handler == "voice" else "audio_file"
                     case "video" | "video_note":
                         await update_progress(wait_message, PROGRESS_MESSAGES["DOWNLOADING"])
                         await update_progress(wait_message, PROGRESS_MESSAGES["PROCESSING"])
                         content_for_summary = await video_handler(reply_msg, context)
-                        summary_type_for_openai = "video_note" if message_type_for_handler == "video_note" else "telegram_video"
+                        summary_type = "video_note" if message_type_for_handler == "video_note" else "telegram_video"
                     case "document":
+                        summary_type = "document" # Set summary_type for document
                         await update_progress(wait_message, PROGRESS_MESSAGES["ANALYZING"])
                         content_for_summary = await document_handler(reply_msg, context)
                         if not content_for_summary:
                             raise ValueError("No se pudo extraer contenido del documento")
-                        summary_type_for_openai = "document"
                         await update_progress(wait_message, PROGRESS_MESSAGES["SUMMARIZING"])
                         summary = await openai_service.summarize_large_document(content_for_summary)
                         await update_progress(wait_message, PROGRESS_MESSAGES["FINALIZING"])
                         await send_long_message(update, summary)
-                        content_for_summary = None  # Mark as processed
+                        content_for_summary = None  # Mark as processed, so the general summary call is skipped
                     case _:
                         await wait_message.edit_text(
                             "Este tipo de mensaje no lo puedo resumir crack. Intenta con mensajes de texto, enlaces a YouTube o artículos web, mensajes de voz, archivos de audio, vídeos o documentos (PDF, DOCX, TXT)."
                         )
                         return
 
-                if content_for_summary and summary_type_for_openai:
+                if content_for_summary and summary_type: # Use summary_type here
                     if not content_for_summary.strip():
                         await wait_message.edit_text(
                             ERROR_MESSAGES.get(
@@ -246,13 +241,16 @@ async def summarize_command(update: Update, context: CallbackContext):
                             )
                         )
                         return
+                    # Para todos los resúmenes de reply, la config del chat se usa para el idioma.
+                    # Los modificadores de tono/longitud/etc no se aplican, según el nuevo diseño.
+                    reply_config = await db_service.get_chat_summary_config(chat_id)
                     await update_progress(wait_message, PROGRESS_MESSAGES["SUMMARIZING"])
-                    summary = await openai_service.get_summary(content_for_summary, summary_type_for_openai)
+                    summary = await openai_service.get_summary(content_for_summary, summary_type, reply_config)
                     await update_progress(wait_message, PROGRESS_MESSAGES["FINALIZING"])
                     await send_long_message(update, summary)
-                elif summary_type_for_openai == "document" and not content_for_summary:
-                    pass
-                elif not content_for_summary and summary_type_for_openai != "document":
+                elif summary_type == "document" and not content_for_summary: # Use summary_type here
+                    pass # Document was handled by summarize_large_document
+                elif not content_for_summary and summary_type != "document": # Use summary_type here
                     await wait_message.edit_text(
                         ERROR_MESSAGES.get(
                             f"ERROR_CANNOT_SUMMARIZE_{message_type_for_handler.upper()}",
