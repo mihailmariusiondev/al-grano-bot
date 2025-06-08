@@ -1,4 +1,5 @@
 from typing import Optional
+from telegram.constants import ParseMode
 from bot.utils.logger import logger
 
 logger = logger.get_logger(__name__)
@@ -23,7 +24,7 @@ class MessageService:
         self.bot = bot
 
     async def send_message(
-        self, chat_id: int, text: str, parse_mode: Optional[str] = None
+        self, chat_id: int, text: str, parse_mode: Optional[str] = ParseMode.MARKDOWN_V2
     ):
         """Send message using bot instance"""
         if not self.bot:
