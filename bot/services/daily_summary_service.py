@@ -118,15 +118,13 @@ async def send_daily_summary_for(chat_id: int):
         # Format messages for the AI
         formatted_content = format_recent_messages(messages)
 
-        # Determine summary type based on configuration
-        summary_type = f"chat_{config['length']}"  # chat_short, chat_medium, chat_long
-
         # Generate summary using custom configuration
         summary = await openai_service.get_summary(
             content=formatted_content,
-            summary_type=summary_type,
+            summary_type="chat_custom", # Use "chat_custom" to trigger dynamic prompt
             language=config['language'],
             tone=config['tone'],
+            length=config['length'], # Pass length as a kwarg
             include_names=config['include_names']
         )
 
