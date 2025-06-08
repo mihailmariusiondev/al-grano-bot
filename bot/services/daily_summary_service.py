@@ -76,7 +76,7 @@ async def generate_daily_summary(chat_id: int) -> str:
 
         # Generate summary
         summary = await openai_service.get_summary(
-            content=formatted_messages, summary_type=summary_type, language="Spanish"
+            content=formatted_messages, summary_type=summary_type, summary_config={"language": "Spanish"}
         )
 
         # Add header to summary
@@ -122,7 +122,7 @@ async def send_daily_summary_for(chat_id: int):
         summary = await openai_service.get_summary(
             content=formatted_content,
             summary_type="chat", # El tipo genérico de chat
-            config=config # Le pasamos toda la configuración
+            summary_config=config # Le pasamos toda la configuración
         )
 
         # Add header to summary

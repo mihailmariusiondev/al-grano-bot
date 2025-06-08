@@ -142,7 +142,7 @@ class OpenAIService:
             self.logger.error(f"Audio transcription failed: {e}", exc_info=True)
             raise RuntimeError(f"Failed to transcribe audio: {str(e)}") from e
 
-    async def get_summary(self, content: str, summary_type: SummaryType, config: Dict) -> str:
+    async def get_summary(self, content: str, summary_type: SummaryType, summary_config: Dict) -> str:
         if not self.initialized:
             raise RuntimeError("OpenAI service not initialized")
 
@@ -153,9 +153,9 @@ class OpenAIService:
 
         # 2. Preparar los posibles modificadores basados en la configuración
         modifiers = {
-            "tone_instruction": generate_tone_modifier(config.get('tone', 'neutral')),
-            "length_instruction": generate_length_modifier(config.get('length', 'medium')),
-            "names_instruction": generate_names_modifier(config.get('include_names', True)),
+            "tone_instruction": generate_tone_modifier(summary_config.get('tone', 'neutral')),
+            "length_instruction": generate_length_modifier(summary_config.get('length', 'medium')),
+            "names_instruction": generate_names_modifier(summary_config.get('include_names', True)),
         }
 
         # 3. Construir el prompt final rellenando la plantilla
@@ -173,7 +173,7 @@ class OpenAIService:
 
         # 4. Añadir la instrucción final de idioma
         language_map = {'es': 'Spanish', 'en': 'English', 'fr': 'French', 'pt': 'Portuguese'}
-        output_language = language_map.get(config.get('language', 'es'), 'Spanish')
+        output_language = language_map.get(summary_config.get('language', 'es'), 'Spanish')
         final_prompt += f"\n\nIMPORTANT: The entire output response must be written in {output_language}."
 
         self.logger.debug(f"Final System Prompt for type '{summary_type}':\n{final_prompt}")
@@ -185,7 +185,7 @@ class OpenAIService:
         ]
 
         # Usar el modelo primario por defecto
-        model = config.get("model", config.OPENROUTER_PRIMARY_MODEL) # Assuming config.OPENROUTER_PRIMARY_MODEL is the default model
+        model = summary_config.get("model", config.OPENROUTER_PRIMARY_MODEL) # Using the imported config module for the default model
 
         try:
             return await self.chat_completion_openrouter(messages, model=model)
@@ -212,8 +212,7 @@ class OpenAIService:
                 return await self.get_summary(
                     content=text,
                     summary_type="document",
-                    language=language,
-                    model=config.OPENROUTER_PRIMARY_MODEL,
+                    summary_config={"language": language, "model": config.OPENROUTER_PRIMARY_MODEL}
                 )
             self.logger.info(f"Documento excede el límite ({text_length}/{self.MAX_INPUT_CHARS_PRIMARY_MODEL}). Dividiendo en chunks...")
             # Adjust chunk_size slightly for safety, ensuring system prompt + user content fits
@@ -227,8 +226,7 @@ class OpenAIService:
                 self.get_summary(
                     content=chunk,
                     summary_type="document",
-                    language=language,
-                    model=config.OPENROUTER_PRIMARY_MODEL,
+                    summary_config={"language": language, "model": config.OPENROUTER_PRIMARY_MODEL}
                 )
                 for chunk in chunks
             ]
@@ -269,8 +267,7 @@ class OpenAIService:
             final_summary = await self.get_summary(
                 content=final_summary_prompt_content,
                 summary_type="document",
-                language=language,
-                model=config.OPENROUTER_PRIMARY_MODEL,
+                summary_config={"language": language, "model": config.OPENROUTER_PRIMARY_MODEL}
             )
             self.logger.info(
                 f"Resumen final generado. Longitud: {len(final_summary)} caracteres"

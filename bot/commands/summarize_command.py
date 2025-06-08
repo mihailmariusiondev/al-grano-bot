@@ -171,7 +171,7 @@ async def summarize_command(update: Update, context: CallbackContext):
                 summary = await openai_service.get_summary(
                     content=formatted_messages,
                     summary_type="chat",
-                    config=chat_config
+                    summary_config=chat_config
                 )
             except ValueError as e:
                 # Handle unsupported language
