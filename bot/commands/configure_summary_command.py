@@ -25,7 +25,7 @@ async def configure_summary_command(update: Update, context: ContextTypes.DEFAUL
         message_text += f"🧠 {get_label('tone_label', language)}: {get_button_label('tone', config['tone'], language)}\n"
         message_text += f"📏 {get_label('length_label', language)}: {get_button_label('length', config['length'], language)}\n"
         message_text += f"🌐 {get_label('language_label', language)}: {get_button_label('language', config['language'], language)}\n"
-        message_text += f"👥 {get_label('names_label', language)}: {get_button_label('include_names', str(config['include_names']).lower(), language)}\n"
+        message_text += f"👥 {get_label('names_label', language)}: {get_button_label('include_names', 'true' if config['include_names'] else 'false', language)}\n"
         message_text += f"⏰ {get_label('hour_label', language)}: {get_button_label('daily_summary_hour', config['daily_summary_hour'], language)}\n"
 
         # Create inline keyboard
