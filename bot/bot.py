@@ -3,6 +3,7 @@ from telegram.ext import (
     ApplicationBuilder,
     CommandHandler,
     MessageHandler,
+    CallbackQueryHandler,
     filters,
 )
 from typing import Optional
@@ -10,19 +11,26 @@ from bot.commands import (
     start_command,
     help_command,
     summarize_command,
-    toggle_daily_summary_command,
-    toggle_summary_type_command,
-    export_chat_command,
+    configure_summary_command,
 )
 from bot.handlers import (
     error_handler,
     message_handler,
 )
+from bot.callbacks import configure_summary_callback
 from bot.utils.logger import logger
 from bot.services.database_service import db_service
 from bot.services.scheduler_service import scheduler_service
 from bot.services.message_service import message_service
+from telegram import Update
+from telegram.ext import ContextTypes
 import asyncio
+
+async def obsolete_command_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle obsolete commands by redirecting to the new configuration command."""
+    await update.message.reply_text(
+        "Este comando ya no existe. Usa /configurar_resumen para personalizar los resúmenes."
+    )
 
 class TelegramBot:
     _instance = None
@@ -65,27 +73,48 @@ class TelegramBot:
     def register_handlers(self):
         if not self.initialized:
             raise RuntimeError("Telegram bot not initialized")
-        self.logger.info("Registering handlers...")
+
+        self.logger.debug("=== REGISTERING BOT HANDLERS ===")
+
+        # Command handlers
+        self.logger.debug("Registering command handlers...")
         self.application.add_handler(CommandHandler("start", start_command))
         self.application.add_handler(CommandHandler("help", help_command))
         self.application.add_handler(CommandHandler("summarize", summarize_command))
+        self.application.add_handler(CommandHandler("configurar_resumen", configure_summary_command))
+        self.logger.debug("Core command handlers registered")
+
+        # Obsolete command handlers
+        self.logger.debug("Registering obsolete command handlers...")
+        self.application.add_handler(CommandHandler("toggle_daily_summary", obsolete_command_handler))
+        self.application.add_handler(CommandHandler("toggle_summary_type", obsolete_command_handler))
+        self.logger.debug("Obsolete command handlers registered")
+
+        # Callback handlers
+        self.logger.debug("Registering callback handlers...")
         self.application.add_handler(
-            CommandHandler("toggle_daily_summary", toggle_daily_summary_command)
+            CallbackQueryHandler(configure_summary_callback, pattern=r'^cfg\|')
         )
-        self.application.add_handler(
-            CommandHandler("toggle_summary_type", toggle_summary_type_command)
-        )
-        self.application.add_handler(CommandHandler("export_chat", export_chat_command))
+        self.logger.debug("Callback handlers registered")
+
+        # Message handlers
+        self.logger.debug("Registering message handlers...")
         self.application.add_handler(
             MessageHandler(filters.TEXT & ~filters.COMMAND, message_handler)
         )
+        self.logger.debug("Message handlers registered")
+
+        # Error handler
+        self.logger.debug("Registering error handler...")
         self.application.add_error_handler(error_handler)
-        self.logger.info("All handlers registered successfully")
+        self.logger.debug("Error handler registered")
+
+        self.logger.info("=== ALL HANDLERS REGISTERED SUCCESSFULLY ===")
 
     async def _start_scheduler(self):
         """Start scheduler in the running event loop"""
         try:
-            scheduler_service.start()
+            await scheduler_service.start()
             self.logger.info("Scheduler started successfully")
         except Exception as e:
             self.logger.error(f"Failed to start scheduler: {e}", exc_info=True)
@@ -94,6 +123,10 @@ class TelegramBot:
     def start(self):
         if not self.initialized:
             raise RuntimeError("Telegram bot not initialized")
+
+        self.logger.info("=== TELEGRAM BOT STARTUP STARTED ===")
+        self.logger.debug(f"Bot token: {self.token[:10]}...")
+
         try:
             self.logger.info("Building Telegram Bot application...")
             self.application = (
@@ -105,19 +138,27 @@ class TelegramBot:
                 .post_shutdown(self._custom_cleanup)
                 .build()
             )
+            self.logger.debug("Application builder configured with timeouts and cleanup")
+
             self.register_handlers()
             message_service.initialize(self.application.bot)
+            self.logger.debug("Message service initialized")
 
             current_loop = asyncio.get_event_loop_policy().get_event_loop()
+            self.logger.debug(f"Current event loop running: {current_loop.is_running()}")
+
             if current_loop.is_running():
                  asyncio.create_task(self._start_scheduler())
+                 self.logger.debug("Scheduler started as async task")
             else:
                  current_loop.run_until_complete(self._start_scheduler())
+                 self.logger.debug("Scheduler started in event loop")
 
-            self.logger.info("Starting bot polling...")
+            self.logger.info("=== STARTING BOT POLLING ===")
             self.application.run_polling()
-            self.logger.info("Bot polling has stopped.")
+            self.logger.info("=== BOT POLLING HAS STOPPED ===")
         except Exception as e:
+            self.logger.error(f"=== BOT STARTUP FAILED ===")
             self.logger.error(f"Failed to start or run bot: {e}", exc_info=True)
             raise
 

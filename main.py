@@ -6,6 +6,8 @@ from bot.services.database_service import db_service
 from bot.services.openai_service import openai_service # Asegurarse de importar openai_service
 from bot.config import config
 from typing import Set
+import os # <-- Importa os
+import logging # <-- Importa logging
 
 logger = logger.get_logger(__name__)
 
@@ -52,6 +54,15 @@ def main():
     try:
         load_dotenv(override=True)
         config.load_from_env() # Carga toda la configuración, incluidas las nuevas claves y URLs
+
+        # FORZAR REINICIALIZACIÓN DEL LOGGER DESPUÉS DE CARGAR .ENV
+        from bot.utils.logger import Logger
+        logger_instance = Logger()
+        logger_instance._init_logger()  # Reinicializar con las nuevas variables de entorno
+
+        # Recrear el logger específico con la nueva configuración
+        global logger
+        logger = logger_instance.get_logger(__name__)
 
         if not config.BOT_TOKEN:
             raise ValueError("BOT_TOKEN environment variable is not set")

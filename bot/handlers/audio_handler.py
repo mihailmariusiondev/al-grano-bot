@@ -3,9 +3,11 @@ from telegram.ext import CallbackContext
 from bot.services import openai_service
 from bot.utils.constants import MAX_FILE_SIZE
 from bot.utils.media_utils import compress_audio, get_file_size
+from bot.utils.logger import logger
 from contextlib import ExitStack
 import tempfile
-import logging
+
+logger = logger.get_logger(__name__)
 
 
 async def audio_handler(message: Message, context: CallbackContext) -> None:
@@ -23,23 +25,25 @@ async def audio_handler(message: Message, context: CallbackContext) -> None:
         file_id = message.audio.file_id if is_audio else message.voice.file_id
         file_size = message.audio.file_size if is_audio else message.voice.file_size
 
-        logging.info(
-            f"Processing {'audio' if is_audio else 'voice'} message from user {user_id}, file_id: {file_id}"
-        )
-        logging.info(f"File size: {file_size} bytes")
+        logger.debug(f"=== AUDIO HANDLER STARTED ===")
+        logger.debug(f"Chat ID: {chat_id}, User ID: {user_id}")
+        logger.debug(f"Message type: {'audio' if is_audio else 'voice'}")
+        logger.debug(f"File ID: {file_id}")
+        logger.debug(f"File size: {file_size} bytes ({file_size/1024/1024:.2f} MB)")
+
+        logger.info(f"Processing {'audio' if is_audio else 'voice'} message from user {user_id}")
 
         if file_size > MAX_FILE_SIZE:
-            logging.warning(
-                f"File size {file_size} exceeds limit of {MAX_FILE_SIZE} bytes"
-            )
+            logger.warning(f"File size {file_size} exceeds limit of {MAX_FILE_SIZE} bytes")
             await message.reply_text(
                 "El archivo es demasiado grande (más de 20 MB). Por favor, envía un archivo más pequeño."
             )
             return None
 
         try:
+            logger.debug("Retrieving file from Telegram")
             file = await context.bot.get_file(file_id)
-            logging.info(f"Retrieved file info: {file.file_path}")
+            logger.info(f"Retrieved file info: {file.file_path}")
 
             with ExitStack() as stack:
                 temp_file = stack.enter_context(
@@ -51,47 +55,46 @@ async def audio_handler(message: Message, context: CallbackContext) -> None:
                 temp_file_path = temp_file.name
                 compressed_file_path = compressed_file.name
 
-                logging.info(
-                    f"Created temporary files: {temp_file_path}, {compressed_file_path}"
-                )
+                logger.debug(f"Created temporary files: {temp_file_path}, {compressed_file_path}")
 
                 try:
+                    logger.debug("Starting file download")
                     await file.download_to_drive(custom_path=temp_file_path)
-                    logging.info(
-                        f"Audio downloaded successfully, size: {get_file_size(temp_file_path)}"
-                    )
+                    downloaded_size = get_file_size(temp_file_path)
+                    logger.info(f"Audio downloaded successfully, size: {downloaded_size} bytes")
 
+                    logger.debug("Starting audio compression")
                     await compress_audio(temp_file_path, compressed_file_path)
-                    logging.info(
-                        f"Audio compressed, new size: {get_file_size(compressed_file_path)}"
-                    )
+                    compressed_size = get_file_size(compressed_file_path)
+                    compression_ratio = compressed_size / downloaded_size if downloaded_size > 0 else 0
+                    logger.info(f"Audio compressed, new size: {compressed_size} bytes (ratio: {compression_ratio:.2f})")
 
-                    transcription = await openai_service.transcribe_audio(
-                        compressed_file_path
-                    )
-                    logging.info(
-                        f"Transcription completed, length: {len(transcription)} chars"
-                    )
+                    logger.debug("Starting audio transcription")
+                    transcription = await openai_service.transcribe_audio(compressed_file_path)
+                    transcription_length = len(transcription)
+                    logger.info(f"=== AUDIO HANDLER COMPLETED SUCCESSFULLY ===")
+                    logger.info(f"Transcription length: {transcription_length} chars")
+                    logger.debug(f"Transcription preview: {transcription[:200]}...")
+
                     return transcription
 
                 except Exception as e:
-                    logging.error(
-                        f"Error processing audio file: {str(e)}", exc_info=True
-                    )
+                    logger.error(f"Error processing audio file: {str(e)}", exc_info=True)
                     await message.reply_text(
                         "Ocurrió un error al procesar el audio. Por favor, inténtalo de nuevo."
                     )
                     return None
 
         except Exception as e:
-            logging.error(f"Error getting file: {str(e)}", exc_info=True)
+            logger.error(f"Error getting file from Telegram: {str(e)}", exc_info=True)
             await message.reply_text(
                 "No pude acceder al archivo de audio. Por favor, inténtalo de nuevo."
             )
             return None
 
     except Exception as e:
-        logging.error(f"Error in audio handler: {str(e)}", exc_info=True)
+        logger.error(f"=== AUDIO HANDLER FAILED ===")
+        logger.error(f"Unexpected error in audio handler: {str(e)}", exc_info=True)
         await message.reply_text(
             "Ocurrió un error inesperado. Por favor, inténtalo de nuevo."
         )
