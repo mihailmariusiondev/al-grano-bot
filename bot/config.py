@@ -24,7 +24,6 @@ class Config:
             self.DB_PATH: str = "bot.db"
             # Other settings
             self.DEBUG_MODE: bool = False
-            self.ENVIRONMENT: str = "development"
             # Auto Admin IDs
             self.AUTO_ADMIN_USER_IDS: Set[int] = set()
             self.initialized = True
@@ -41,7 +40,6 @@ class Config:
         self.OPENROUTER_FALLBACK_MODEL = os.getenv("OPENROUTER_FALLBACK_MODEL", self.OPENROUTER_FALLBACK_MODEL) # Default is now the new model
         self.DB_PATH = os.getenv("DB_PATH", "bot.db")
         self.DEBUG_MODE = os.getenv("DEBUG_MODE", "false").lower() == "true"
-        self.ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
         auto_admin_ids_str = os.getenv("AUTO_ADMIN_USER_IDS_CSV")
         if auto_admin_ids_str:
             try:

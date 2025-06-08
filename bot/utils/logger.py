@@ -71,7 +71,6 @@ class Logger:
             root_logger.info(f"Log level: {log_level_name} ({self.log_level})")
             root_logger.info(f"Log directory: {self.log_dir}")
             root_logger.info(f"Debug mode: {debug_mode}")
-            root_logger.info(f"Environment: {os.getenv('ENVIRONMENT', 'development')}")
             root_logger.info(f"Respecting LOG_LEVEL environment variable: {log_level_name}")
 
         except Exception as e:
