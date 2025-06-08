@@ -95,6 +95,18 @@ class OpenAIService:
         self.logger.debug(f"Estimated input tokens: {estimated_tokens}")
         self.logger.debug(f"System prompt length: {len(messages[0]['content']) if messages and messages[0]['role'] == 'system' else 0}")
 
+        # Log complete message content for debugging
+        self.logger.debug(f"=== COMPLETE MESSAGES PAYLOAD ===")
+        for i, message in enumerate(messages):
+            role = message.get('role', 'unknown')
+            content = message.get('content', '')
+            self.logger.debug(f"Message {i+1} [{role}]: {content}")
+        self.logger.debug(f"=== END MESSAGES PAYLOAD ===")
+
+        # Log extra headers if present
+        if extra_headers:
+            self.logger.debug(f"Extra headers: {extra_headers}")
+
         try:
             self.logger.info(f"Sending chat completion request to {model}")
             response = await client.chat.completions.create(
@@ -113,6 +125,11 @@ class OpenAIService:
             self.logger.debug(f"Response length: {response_length} chars")
             self.logger.debug(f"Estimated response tokens: {estimated_response_tokens}")
             self.logger.debug(f"Total estimated tokens used: {estimated_tokens + estimated_response_tokens}")
+
+            # Log complete response content for debugging
+            self.logger.debug(f"=== COMPLETE RESPONSE CONTENT ===")
+            self.logger.debug(f"Response: {response_content}")
+            self.logger.debug(f"=== END RESPONSE CONTENT ===")
 
             # Log usage info if available
             if hasattr(response, 'usage') and response.usage:
