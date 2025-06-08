@@ -51,8 +51,21 @@ class MessageService:
                 await self.bot.send_message(chat_id=chat_id, text=text, parse_mode=parse_mode)
             return True
         except TelegramError as e:
-            logger.error(f"Error sending message to chat {chat_id}: {e}", exc_info=True)
-            return False
+            # If markdown parsing fails, try without formatting
+            if parse_mode and "can't parse" in str(e).lower():
+                logger.warning(f"Markdown parsing failed for chat {chat_id}, trying without formatting: {e}")
+                try:
+                    if len(text) > MessageLimit.MAX_TEXT_LENGTH:
+                        return await self.send_long_message(chat_id, text, None)
+                    else:
+                        await self.bot.send_message(chat_id=chat_id, text=text, parse_mode=None)
+                    return True
+                except TelegramError as e2:
+                    logger.error(f"Error sending message without formatting to chat {chat_id}: {e2}", exc_info=True)
+                    return False
+            else:
+                logger.error(f"Error sending message to chat {chat_id}: {e}", exc_info=True)
+                return False
         except Exception as e:
             logger.error(f"Unexpected error sending message to chat {chat_id}: {e}", exc_info=True)
             return False
@@ -84,11 +97,23 @@ class MessageService:
                 part_indicator = f"[Parte {i+1}/{len(chunks)}]\n" if len(chunks) > 1 else ""
                 message_text = f"{part_indicator}{chunk}"
 
-                await self.bot.send_message(
-                    chat_id=chat_id,
-                    text=message_text,
-                    parse_mode=parse_mode
-                )
+                try:
+                    await self.bot.send_message(
+                        chat_id=chat_id,
+                        text=message_text,
+                        parse_mode=parse_mode
+                    )
+                except TelegramError as e:
+                    # If markdown parsing fails for this chunk, try without formatting
+                    if parse_mode and "can't parse" in str(e).lower():
+                        logger.warning(f"Markdown parsing failed for chunk {i+1}, trying without formatting: {e}")
+                        await self.bot.send_message(
+                            chat_id=chat_id,
+                            text=message_text,
+                            parse_mode=None
+                        )
+                    else:
+                        raise  # Re-raise the error if it's not a parsing issue
 
                 # Add pause between chunks to avoid rate limiting
                 if i < len(chunks) - 1:  # Don't pause after the last chunk
