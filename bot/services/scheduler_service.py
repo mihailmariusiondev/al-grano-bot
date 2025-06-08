@@ -22,38 +22,65 @@ class SchedulerService:
 
     async def start(self):
         """Start the scheduler and load all configured daily summary jobs"""
+        logger.debug(f"=== SCHEDULER SERVICE START ===")
+
         try:
             if not self.scheduler.running:
+                logger.debug("Scheduler not running, initializing...")
+
                 # Load all configured daily summary jobs
+                logger.debug("Loading daily summary jobs from database...")
                 await self._load_daily_summary_jobs()
 
+                logger.debug("Starting APScheduler...")
                 self.scheduler.start()
-                logger.info("Scheduler started successfully with dynamic jobs")
+
+                # Log current jobs
+                jobs = self.get_scheduled_jobs()
+                logger.info(f"=== SCHEDULER STARTED SUCCESSFULLY ===")
+                logger.info(f"Active jobs: {len(jobs)}")
+                for job in jobs:
+                    logger.debug(f"Job: {job['id']} - {job['name']} - Next run: {job['next_run']}")
+            else:
+                logger.warning("Scheduler was already running")
+
         except Exception as e:
+            logger.error(f"=== SCHEDULER START FAILED ===")
             logger.error(f"Error starting scheduler: {e}", exc_info=True)
             raise
 
     async def _load_daily_summary_jobs(self):
         """Load all daily summary jobs from database configuration"""
+        logger.debug("=== LOADING DAILY SUMMARY JOBS ===")
+
         try:
             # Import here to avoid circular imports
             from bot.services.database_service import db_service
 
             # Get all chats with daily summaries enabled
+            logger.debug("Querying database for daily summary configurations...")
             configs = await db_service.get_all_daily_summary_configs()
 
-            logger.info(f"Loading {len(configs)} daily summary jobs")
+            logger.info(f"Found {len(configs)} daily summary configurations")
+            jobs_created = 0
 
             # Create a job for each chat
             for config in configs:
                 chat_id = config['chat_id']
                 hour = config['daily_summary_hour']
 
+                logger.debug(f"Processing config - Chat: {chat_id}, Hour: {hour}")
+
                 if hour != 'off':
                     self.add_daily_summary_job(chat_id, hour)
+                    jobs_created += 1
+                else:
+                    logger.debug(f"Skipping chat {chat_id} - daily summary is off")
+
+            logger.info(f"Successfully created {jobs_created} daily summary jobs")
 
         except Exception as e:
-            logger.error(f"Error loading daily summary jobs: {e}", exc_info=True)
+            logger.error(f"Failed to load daily summary jobs: {e}", exc_info=True)
 
     def add_daily_summary_job(self, chat_id: int, hour: str):
         """Add or update a daily summary job for a specific chat.

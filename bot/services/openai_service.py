@@ -80,8 +80,23 @@ class OpenAIService:
     ) -> str:
         if not self.initialized:
             raise RuntimeError("OpenAI service not initialized")
+
+        # Calculate approximate token count for logging
+        total_chars = sum(len(msg.get('content', '')) for msg in messages)
+        estimated_tokens = int(total_chars / self.CHARS_PER_TOKEN_ESTIMATE)
+
+        self.logger.debug(f"=== CHAT COMPLETION REQUEST ===")
+        self.logger.debug(f"Model: {model}")
+        self.logger.debug(f"Client: {'OpenRouter' if client == self.openrouter_client else 'OpenAI'}")
+        self.logger.debug(f"Temperature: {temperature}")
+        self.logger.debug(f"Max tokens: {max_tokens}")
+        self.logger.debug(f"Messages count: {len(messages)}")
+        self.logger.debug(f"Total content chars: {total_chars}")
+        self.logger.debug(f"Estimated input tokens: {estimated_tokens}")
+        self.logger.debug(f"System prompt length: {len(messages[0]['content']) if messages and messages[0]['role'] == 'system' else 0}")
+
         try:
-            self.logger.debug(f"Making chat completion request with model {model} via {'OpenRouter' if client == self.openrouter_client else 'OpenAI'}")
+            self.logger.info(f"Sending chat completion request to {model}")
             response = await client.chat.completions.create(
                 model=model,
                 messages=messages,
@@ -89,7 +104,22 @@ class OpenAIService:
                 max_tokens=max_tokens,
                 extra_headers=extra_headers if extra_headers else None
             )
-            return response.choices[0].message.content
+
+            response_content = response.choices[0].message.content
+            response_length = len(response_content) if response_content else 0
+            estimated_response_tokens = int(response_length / self.CHARS_PER_TOKEN_ESTIMATE)
+
+            self.logger.debug(f"=== CHAT COMPLETION RESPONSE ===")
+            self.logger.debug(f"Response length: {response_length} chars")
+            self.logger.debug(f"Estimated response tokens: {estimated_response_tokens}")
+            self.logger.debug(f"Total estimated tokens used: {estimated_tokens + estimated_response_tokens}")
+
+            # Log usage info if available
+            if hasattr(response, 'usage') and response.usage:
+                self.logger.info(f"Token usage - Prompt: {response.usage.prompt_tokens}, Completion: {response.usage.completion_tokens}, Total: {response.usage.total_tokens}")
+
+            self.logger.info(f"Chat completion successful with model {model}")
+            return response_content
         except Exception as e:
             self.logger.error(f"Chat completion failed for model {model}: {e}", exc_info=True)
             # Intentar con fallback si es OpenRouter y el modelo es el primario
@@ -131,52 +161,98 @@ class OpenAIService:
     ) -> str:
         if not self.initialized:
             raise RuntimeError("OpenAI service not initialized")
+
+        self.logger.debug(f"=== AUDIO TRANSCRIPTION STARTED ===")
+        self.logger.debug(f"File path: {file_path}")
+        self.logger.debug(f"Model: {model}")
+        self.logger.debug(f"Language: {language}")
+
         try:
-            self.logger.debug(f"Transcribing audio file: {file_path} using OpenAI client")
+            # Check file exists and get size
+            import os
+            if not os.path.exists(file_path):
+                raise FileNotFoundError(f"Audio file not found: {file_path}")
+
+            file_size = os.path.getsize(file_path)
+            self.logger.debug(f"Audio file size: {file_size} bytes ({file_size/1024/1024:.2f} MB)")
+
+            self.logger.info(f"Starting transcription of {file_path} with Whisper")
             with open(file_path, "rb") as audio_file:
                 response = await self.openai_client.audio.transcriptions.create(
                     model=model, file=audio_file, language=language
                 )
-            return response.text
+
+            transcription_text = response.text
+            transcription_length = len(transcription_text)
+
+            self.logger.debug(f"=== AUDIO TRANSCRIPTION COMPLETED ===")
+            self.logger.debug(f"Transcription length: {transcription_length} chars")
+            self.logger.info(f"Audio transcription successful for {file_path}")
+
+            return transcription_text
         except Exception as e:
-            self.logger.error(f"Audio transcription failed: {e}", exc_info=True)
+            self.logger.error(f"Audio transcription failed for {file_path}: {e}", exc_info=True)
             raise RuntimeError(f"Failed to transcribe audio: {str(e)}") from e
 
     async def get_summary(self, content: str, summary_type: SummaryType, summary_config: Dict) -> str:
         if not self.initialized:
             raise RuntimeError("OpenAI service not initialized")
 
+        self.logger.debug(f"=== GET_SUMMARY STARTED ===")
+        self.logger.debug(f"Summary type: {summary_type}")
+        self.logger.debug(f"Content length: {len(content)} chars")
+        self.logger.debug(f"Summary config: {summary_config}")
+
         # 1. Obtener la plantilla base
         base_template = BASE_PROMPTS.get(summary_type)
         if not base_template:
+            self.logger.error(f"No template found for summary type: {summary_type}")
             raise ValueError(f"Unsupported summary type: {summary_type}")
 
+        self.logger.debug(f"Base template length: {len(base_template)} chars")
+
         # 2. Preparar los posibles modificadores basados en la configuración
+        tone = summary_config.get('tone', 'neutral')
+        length = summary_config.get('length', 'medium')
+        include_names = summary_config.get('include_names', True)
+        language = summary_config.get('language', 'es')
+
+        self.logger.debug(f"Modifiers - Tone: {tone}, Length: {length}, Include names: {include_names}, Language: {language}")
+
         modifiers = {
-            "tone_instruction": generate_tone_modifier(summary_config.get('tone', 'neutral')),
-            "length_instruction": generate_length_modifier(summary_config.get('length', 'medium')),
-            "names_instruction": generate_names_modifier(summary_config.get('include_names', True)),
+            "tone_instruction": generate_tone_modifier(tone),
+            "length_instruction": generate_length_modifier(length),
+            "names_instruction": generate_names_modifier(include_names),
         }
 
         # 3. Construir el prompt final rellenando la plantilla
         # Usamos un bucle para reemplazar solo los placeholders que existen en la plantilla.
         # Esto evita errores si una plantilla no tiene un placeholder como {tone_instruction}.
         final_prompt = base_template
+        replacements_made = 0
         for key, value in modifiers.items():
             placeholder = f"{{{key}}}"
             if placeholder in final_prompt:
                 final_prompt = final_prompt.replace(placeholder, value)
+                replacements_made += 1
+                self.logger.debug(f"Replaced {placeholder} with modifier")
+
+        self.logger.debug(f"Made {replacements_made} placeholder replacements")
 
         # Limpiar placeholders no utilizados (si los hubiera)
         import re
+        unused_placeholders = re.findall(r'\{[a-z_]+_instruction\}', final_prompt)
+        if unused_placeholders:
+            self.logger.debug(f"Cleaning unused placeholders: {unused_placeholders}")
         final_prompt = re.sub(r'\{[a-z_]+_instruction\}', '', final_prompt)
 
         # 4. Añadir la instrucción final de idioma
         language_map = {'es': 'Spanish', 'en': 'English', 'fr': 'French', 'pt': 'Portuguese'}
-        output_language = language_map.get(summary_config.get('language', 'es'), 'Spanish')
+        output_language = language_map.get(language, 'Spanish')
         final_prompt += f"\n\nIMPORTANT: The entire output response must be written in {output_language}."
 
-        self.logger.debug(f"Final System Prompt for type '{summary_type}':\n{final_prompt}")
+        self.logger.debug(f"Final prompt length: {len(final_prompt)} chars")
+        self.logger.debug(f"Output language set to: {output_language}")
 
         # 5. Llamar a la API de OpenAI
         messages = [
@@ -186,9 +262,13 @@ class OpenAIService:
 
         # Usar el modelo primario por defecto
         model = summary_config.get("model", config.OPENROUTER_PRIMARY_MODEL) # Using the imported config module for the default model
+        self.logger.info(f"Using model: {model} for summary type: {summary_type}")
 
         try:
-            return await self.chat_completion_openrouter(messages, model=model)
+            result = await self.chat_completion_openrouter(messages, model=model)
+            self.logger.info(f"Summary generation completed successfully for type {summary_type}")
+            self.logger.debug(f"Generated summary length: {len(result) if result else 0} chars")
+            return result
         except Exception as e:
             self.logger.error(f"Summary generation failed for type {summary_type}: {e}", exc_info=True)
             raise

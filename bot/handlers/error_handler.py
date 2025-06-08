@@ -23,17 +23,28 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
     # Get current system exception
     exc_info = sys.exc_info()
 
+    # Extract basic info for logging
+    error_type = type(context.error).__name__
+    error_message = str(context.error)
+    user_id = getattr(update, 'effective_user', {}).id if hasattr(update, 'effective_user') and update.effective_user else 'Unknown'
+    chat_id = getattr(update, 'effective_chat', {}).id if hasattr(update, 'effective_chat') and update.effective_chat else 'Unknown'
+
+    logger.error(f"=== ERROR HANDLER TRIGGERED ===")
+    logger.error(f"Error Type: {error_type}")
+    logger.error(f"Error Message: {error_message}")
+    logger.error(f"User ID: {user_id}, Chat ID: {chat_id}")
+
     # Log complete error information
     logger.error(
-        "\n=== Error Details ===\n"
-        f"Error Type: {type(context.error).__name__}\n"
-        f"Error Message: {str(context.error)}\n"
+        "\n=== Detailed Error Information ===\n"
+        f"Error Type: {error_type}\n"
+        f"Error Message: {error_message}\n"
         f"Update: {update}\n"
         f"Chat Data: {context.chat_data}\n"
         f"User Data: {context.user_data}\n"
         f"=== Full Traceback ===\n"
         f"{''.join(traceback.format_tb(exc_info[2]))}\n"
-        "===================="
+        "=========================================="
     )
 
     error = context.error

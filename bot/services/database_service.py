@@ -29,10 +29,15 @@ class DatabaseService:
 
     async def initialize(self, db_path: str = "bot.db"):
         """Initialize database connection and create tables"""
+        self.logger.debug(f"=== DATABASE INITIALIZATION STARTED ===")
+        self.logger.debug(f"Database path: {db_path}")
+
         try:
             self.db_path = db_path
             self.conn = await aiosqlite.connect(db_path)
             self.conn.row_factory = aiosqlite.Row
+
+            self.logger.info(f"Database connection established: {db_path}")
 
             # Create tables
             await self.conn.execute(
@@ -246,10 +251,11 @@ class DatabaseService:
                 self.logger.warning(f"Migration from old schema failed (this is normal for new installations): {e}")
 
             await self.conn.commit()
-            self.logger.info("Database initialized successfully")
-
+            self.logger.info("=== DATABASE INITIALIZATION COMPLETED SUCCESSFULLY ===")
+            self.logger.debug(f"All tables and triggers created/verified")
         except Exception as e:
-            self.logger.error(f"Failed to initialize database: {e}", exc_info=True)
+            self.logger.error(f"=== DATABASE INITIALIZATION FAILED ===")
+            self.logger.error(f"Database initialization error: {e}", exc_info=True)
             raise
 
     async def execute(
@@ -258,16 +264,30 @@ class DatabaseService:
         """Execute a query (INSERT, UPDATE, DELETE)"""
         if not self.conn:
             raise RuntimeError("Database not initialized")
+
+        # Log query details
+        query_type = query.strip().split()[0].upper()
+        self.logger.debug(f"=== DATABASE EXECUTE: {query_type} ===")
+        self.logger.debug(f"Query: {query}")
+        self.logger.debug(f"Params: {params}")
+        self.logger.debug(f"Auto commit: {auto_commit}")
+
         try:
             async with self.conn.cursor() as cursor:
                 await cursor.execute(query, params)
+                rows_affected = cursor.rowcount
+
                 if auto_commit:
                     await self.conn.commit()
-                    self.logger.debug(f"Query executed and committed: {query}")
+                    self.logger.debug(f"Query executed and committed. Rows affected: {rows_affected}")
                 else:
-                    self.logger.debug(f"Query executed without commit: {query}")
+                    self.logger.debug(f"Query executed without commit. Rows affected: {rows_affected}")
+
         except Exception as e:
-            self.logger.error(f"Error executing query: {query}, error: {str(e)}")
+            self.logger.error(f"Database query failed - Type: {query_type}")
+            self.logger.error(f"Query: {query}")
+            self.logger.error(f"Params: {params}")
+            self.logger.error(f"Error: {str(e)}", exc_info=True)
             if auto_commit:
                 await self.conn.rollback()
                 self.logger.debug("Transaction rolled back")
@@ -277,17 +297,45 @@ class DatabaseService:
         """Fetch a single row from the database"""
         if not self.conn:
             raise RuntimeError("Database not initialized")
-        async with self.conn.execute(query, params) as cursor:
-            result = await cursor.fetchone()
-            return dict(result) if result else None
+
+        self.logger.debug(f"=== DATABASE FETCH_ONE ===")
+        self.logger.debug(f"Query: {query}")
+        self.logger.debug(f"Params: {params}")
+
+        try:
+            async with self.conn.execute(query, params) as cursor:
+                result = await cursor.fetchone()
+                result_dict = dict(result) if result else None
+                self.logger.debug(f"Result: {'Found 1 row' if result_dict else 'No rows found'}")
+                return result_dict
+        except Exception as e:
+            self.logger.error(f"Database fetch_one failed")
+            self.logger.error(f"Query: {query}")
+            self.logger.error(f"Params: {params}")
+            self.logger.error(f"Error: {str(e)}", exc_info=True)
+            raise
 
     async def fetch_all(self, query: str, params: tuple = ()) -> List[Dict]:
         """Fetch all rows from the database"""
         if not self.conn:
             raise RuntimeError("Database not initialized")
-        async with self.conn.execute(query, params) as cursor:
-            rows = await cursor.fetchall()
-            return [dict(row) for row in rows]
+
+        self.logger.debug(f"=== DATABASE FETCH_ALL ===")
+        self.logger.debug(f"Query: {query}")
+        self.logger.debug(f"Params: {params}")
+
+        try:
+            async with self.conn.execute(query, params) as cursor:
+                rows = await cursor.fetchall()
+                result_list = [dict(row) for row in rows]
+                self.logger.debug(f"Result: Found {len(result_list)} rows")
+                return result_list
+        except Exception as e:
+            self.logger.error(f"Database fetch_all failed")
+            self.logger.error(f"Query: {query}")
+            self.logger.error(f"Params: {params}")
+            self.logger.error(f"Error: {str(e)}", exc_info=True)
+            raise
 
     async def close(self):
         """Close the database connection"""

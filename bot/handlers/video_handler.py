@@ -1,5 +1,4 @@
 import tempfile
-import logging
 import contextlib
 from pathlib import Path
 from telegram import Message
@@ -7,8 +6,9 @@ from telegram.ext import CallbackContext
 from bot.services import openai_service
 from bot.utils.media_utils import compress_audio, extract_audio, get_file_size
 from bot.utils.constants import MAX_FILE_SIZE
+from bot.utils.logger import logger
 
-logging = logging.getLogger(__name__)
+logger = logger.get_logger(__name__)
 
 
 async def video_handler(message: Message, context: CallbackContext) -> None:
@@ -19,6 +19,8 @@ async def video_handler(message: Message, context: CallbackContext) -> None:
         message: Telegram message containing video or video note
         context: Callback context
     """
+    logger.debug(f"=== VIDEO HANDLER STARTED ===")
+
     try:
         # Get file details based on message type
         is_video_note = bool(message.video_note)
@@ -27,16 +29,19 @@ async def video_handler(message: Message, context: CallbackContext) -> None:
             message.video_note.file_size if is_video_note else message.video.file_size
         )
 
-        logging.info(
-            f"Processing video from user {message.from_user.id}, file_id: {file_id}"
-        )
-        logging.info(f"Video file size: {file_size} bytes")
+        user_id = message.from_user.id
+        video_type = "video_note" if is_video_note else "video"
+
+        logger.debug(f"User ID: {user_id}")
+        logger.debug(f"Video type: {video_type}")
+        logger.debug(f"File ID: {file_id}")
+        logger.debug(f"File size: {file_size} bytes ({file_size/1024/1024:.2f} MB)")
+
+        logger.info(f"Processing {video_type} from user {user_id}")
 
         # Check file size limit
         if file_size > MAX_FILE_SIZE:
-            logging.warning(
-                f"Video size {file_size} exceeds limit of {MAX_FILE_SIZE} bytes"
-            )
+            logger.warning(f"Video size {file_size} exceeds limit of {MAX_FILE_SIZE} bytes")
             await message.reply_text(
                 "El archivo es demasiado grande (más de 20 MB). Por favor, envía un archivo más pequeño."
             )
