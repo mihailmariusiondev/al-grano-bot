@@ -98,9 +98,7 @@
 
     # Opcionales (valores por defecto mostrados)
     # DB_PATH="bot.db"
-    # DEBUG_MODE="false"
     # LOG_LEVEL="INFO"
-    # ENVIRONMENT="development"
     # AUTO_ADMIN_USER_IDS_CSV="ID_USUARIO_1,ID_USUARIO_2" # IDs de Telegram separados por comas
     ```
 
