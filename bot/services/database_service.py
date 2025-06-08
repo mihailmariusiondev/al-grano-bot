@@ -409,6 +409,13 @@ class DatabaseService:
             day_start_utc = day_start.astimezone(pytz.UTC)
             day_end_utc = day_end.astimezone(pytz.UTC)
 
+            self.logger.debug(f"=== GET_MESSAGES_FOR_DATE DEBUG ===")
+            self.logger.debug(f"Input date: {date}")
+            self.logger.debug(f"Madrid day_start: {day_start}")
+            self.logger.debug(f"Madrid day_end: {day_end}")
+            self.logger.debug(f"UTC day_start: {day_start_utc} ({day_start_utc.isoformat()})")
+            self.logger.debug(f"UTC day_end: {day_end_utc} ({day_end_utc.isoformat()})")
+
             query = """
                 SELECT m.message_text, m.created_at, m.telegram_message_id,
                        m.telegram_reply_to_message_id,
@@ -420,10 +427,27 @@ class DatabaseService:
                 ORDER BY m.telegram_message_id ASC
             """
 
+            self.logger.debug(f"Query params: chat_id={chat_id}, start={day_start_utc.isoformat()}, end={day_end_utc.isoformat()}")
+
             messages = await self.fetch_all(
                 query,
                 (chat_id, day_start_utc.isoformat(), day_end_utc.isoformat()),
             )
+
+            self.logger.debug(f"Messages found for date {date}: {len(messages)}")
+
+            # Let's also check all messages for this chat to see what dates we have
+            debug_query = """
+                SELECT m.created_at, COUNT(*) as count
+                FROM telegram_message m
+                WHERE m.chat_id = ?
+                GROUP BY DATE(m.created_at)
+                ORDER BY m.created_at DESC
+                LIMIT 10
+            """
+            debug_results = await self.fetch_all(debug_query, (chat_id,))
+            self.logger.debug(f"Recent message dates in this chat: {debug_results}")
+
             return messages
         except Exception as e:
             self.logger.error(f"Error getting messages for date: {e}", exc_info=True)
