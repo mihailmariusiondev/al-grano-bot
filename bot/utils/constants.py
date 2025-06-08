@@ -87,6 +87,7 @@ LABELS = {
                 'neutral': "Neutral 🧾",
                 'informal': "Informal 🙂",
                 'sarcastic': "Sarcástico 😈",
+                'colega': "Colega 🗣️",
                 'ironic': "Irónico 🙃",
                 'absurd': "Absurdo 🤪"
             },
@@ -162,6 +163,7 @@ LABELS = {
                 'neutral': "Neutral 🧾",
                 'informal': "Informal 🙂",
                 'sarcastic': "Sarcastic 😈",
+                'colega': "Buddy 🗣️",
                 'ironic': "Ironic 🙃",
                 'absurd': "Absurd 🤪"
             },
@@ -237,6 +239,7 @@ LABELS = {
                 'neutral': "Neutre 🧾",
                 'informal': "Informel 🙂",
                 'sarcastic': "Sarcastique 😈",
+                'colega': "Pote 🗣️",
                 'ironic': "Ironique 🙃",
                 'absurd': "Absurde 🤪"
             },
@@ -312,8 +315,9 @@ LABELS = {
                 'neutral': "Neutro 🧾",
                 'informal': "Informal 🙂",
                 'sarcastic': "Sarcástico 😈",
+                'colega': "Colega 🗣️",
                 'ironic': "Irônico 🙃",
-                'absurd': "Absurdo 🤪"
+                'absurdo': "Absurdo 🤪"
             },
             'length': {
                 'short': "Curto 📝",
