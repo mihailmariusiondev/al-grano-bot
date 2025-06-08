@@ -98,15 +98,15 @@ def format_recent_messages(recent_messages: List[Dict]) -> str:
 
 
 async def send_long_message(update: Update, text: str) -> None:
-    """Split and send long messages respecting Telegram's limits
+    """Split and send long messages respecting Telegram's limits with Markdown formatting
 
     This function maintains backward compatibility with the existing interface
     while leveraging the improved message_service functionality.
     """
     chat_id = update.effective_chat.id
 
-    # Use the improved message_service which handles long messages automatically
-    success = await message_service.send_message(chat_id, text)
+    # Use the improved message_service with Markdown support
+    success = await message_service.send_message(chat_id, text, parse_mode="Markdown")
 
     if not success:
         # Fallback to basic reply if message_service fails
@@ -118,9 +118,17 @@ async def send_long_message(update: Update, text: str) -> None:
             ]
 
             for chunk in chunks:
-                await update.message.reply_text(chunk)
+                await update.message.reply_text(chunk, parse_mode="Markdown")
                 if len(chunks) > 1:
                     await asyncio.sleep(PAUSE_BETWEEN_CHUNKS)
         except Exception as e:
             logging.error(f"Fallback also failed for chat {chat_id}: {e}")
-            raise
+            # If Markdown fails, try without formatting
+            try:
+                for chunk in chunks:
+                    await update.message.reply_text(chunk)
+                    if len(chunks) > 1:
+                        await asyncio.sleep(PAUSE_BETWEEN_CHUNKS)
+            except Exception as e2:
+                logging.error(f"Plain text fallback also failed for chat {chat_id}: {e2}")
+                raise

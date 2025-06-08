@@ -12,6 +12,9 @@ CHUNK_SIZE = 4096  # Maximum characters per message
 PAUSE_BETWEEN_CHUNKS = 0.5  # Seconds between message chunks
 MAX_RECENT_MESSAGES = 300  # Maximum messages to fetch for summarization
 
+# Export handling
+EXPORT_PROGRESS_BATCH_SIZE = 100  # Messages per progress log in export_chat
+
 # File handling
 MAX_FILE_SIZE = 20 * 1024 * 1024  # 20MB in bytes
 
@@ -84,6 +87,7 @@ LABELS = {
                 'neutral': "Neutral 🧾",
                 'informal': "Informal 🙂",
                 'sarcastic': "Sarcástico 😈",
+                'colega': "Colega 🗣️",
                 'ironic': "Irónico 🙃",
                 'absurd': "Absurdo 🤪"
             },
@@ -159,6 +163,7 @@ LABELS = {
                 'neutral': "Neutral 🧾",
                 'informal': "Informal 🙂",
                 'sarcastic': "Sarcastic 😈",
+                'colega': "Buddy 🗣️",
                 'ironic': "Ironic 🙃",
                 'absurd': "Absurd 🤪"
             },
@@ -234,6 +239,7 @@ LABELS = {
                 'neutral': "Neutre 🧾",
                 'informal': "Informel 🙂",
                 'sarcastic': "Sarcastique 😈",
+                'colega': "Pote 🗣️",
                 'ironic': "Ironique 🙃",
                 'absurd': "Absurde 🤪"
             },
@@ -309,8 +315,9 @@ LABELS = {
                 'neutral': "Neutro 🧾",
                 'informal': "Informal 🙂",
                 'sarcastic': "Sarcástico 😈",
+                'colega': "Colega 🗣️",
                 'ironic': "Irônico 🙃",
-                'absurd': "Absurdo 🤪"
+                'absurdo': "Absurdo 🤪"
             },
             'length': {
                 'short': "Curto 📝",

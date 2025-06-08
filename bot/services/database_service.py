@@ -1,4 +1,6 @@
 import aiosqlite
+from datetime import datetime
+import pytz
 from typing import Optional, List, Dict
 from datetime import datetime, timedelta
 import pytz
@@ -391,6 +393,64 @@ class DatabaseService:
             return messages
         except Exception as e:
             self.logger.error(f"Error getting recent messages: {e}")
+            raise
+
+    async def get_messages_for_date(self, chat_id: int, date) -> List[Dict]:
+        """Get all messages for a specific date (00:00 - 23:59)"""
+        try:
+            madrid_tz = pytz.timezone("Europe/Madrid")
+            day_start = datetime(
+                date.year, date.month, date.day, 0, 0, 0, tzinfo=madrid_tz
+            )
+            day_end = day_start.replace(
+                hour=23, minute=59, second=59, microsecond=999999
+            )
+
+            day_start_utc = day_start.astimezone(pytz.UTC)
+            day_end_utc = day_end.astimezone(pytz.UTC)
+
+            self.logger.debug(f"=== GET_MESSAGES_FOR_DATE DEBUG ===")
+            self.logger.debug(f"Input date: {date}")
+            self.logger.debug(f"Madrid day_start: {day_start}")
+            self.logger.debug(f"Madrid day_end: {day_end}")
+            self.logger.debug(f"UTC day_start: {day_start_utc} ({day_start_utc.isoformat()})")
+            self.logger.debug(f"UTC day_end: {day_end_utc} ({day_end_utc.isoformat()})")
+
+            query = """
+                SELECT m.message_text, m.created_at, m.telegram_message_id,
+                       m.telegram_reply_to_message_id,
+                       u.user_id, u.first_name, u.last_name, u.username
+                FROM telegram_message m
+                JOIN telegram_user u ON m.user_id = u.user_id
+                WHERE m.chat_id = ?
+                AND m.created_at BETWEEN ? AND ?
+                ORDER BY m.telegram_message_id ASC
+            """
+
+            self.logger.debug(f"Query params: chat_id={chat_id}, start={day_start_utc.isoformat()}, end={day_end_utc.isoformat()}")
+
+            messages = await self.fetch_all(
+                query,
+                (chat_id, day_start_utc.isoformat(), day_end_utc.isoformat()),
+            )
+
+            self.logger.debug(f"Messages found for date {date}: {len(messages)}")
+
+            # Let's also check all messages for this chat to see what dates we have
+            debug_query = """
+                SELECT m.created_at, COUNT(*) as count
+                FROM telegram_message m
+                WHERE m.chat_id = ?
+                GROUP BY DATE(m.created_at)
+                ORDER BY m.created_at DESC
+                LIMIT 10
+            """
+            debug_results = await self.fetch_all(debug_query, (chat_id,))
+            self.logger.debug(f"Recent message dates in this chat: {debug_results}")
+
+            return messages
+        except Exception as e:
+            self.logger.error(f"Error getting messages for date: {e}", exc_info=True)
             raise
 
     async def save_message(

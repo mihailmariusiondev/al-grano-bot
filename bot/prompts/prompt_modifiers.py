@@ -7,6 +7,7 @@ def generate_tone_modifier(tone: str) -> str:
         "neutral": "The summary must have a neutral and objective tone.",
         "informal": "The summary must have a casual and friendly tone.",
         "sarcastic": "The summary must have a sarcastic and witty tone, subtly mocking the conversation's absurdities.",
+        "colega": "Summarize like you're that sarcastic friend who read everything and is telling someone who's late to the chat what happened. Exaggerate just enough, throw in some playful jabs, ironize with wit, and don't hold back from pointing out stupid stuff. Don't be neutral: be sharp, but fun. Keep the tone ruthless but friendly, like that colleague who tells you the office gossip.",
         "ironic": "The summary must have a clever, ironic tone, pointing out contradictions or hidden meanings.",
         "absurd": "The summary must have a surreal and absurd tone, using strange metaphors or comparisons."
     }
