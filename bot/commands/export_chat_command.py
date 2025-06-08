@@ -61,7 +61,7 @@ def build_conversation_threads(messages):
     return threads, standalone_messages
 
 
-def format_for_ai_analysis(messages, chat_id, date):
+def format_for_ai_analysis(messages, chat_id, export_time):
     """Format messages in an AI-friendly structure for analysis"""
     madrid_tz = pytz.timezone("Europe/Madrid")
 
@@ -109,7 +109,7 @@ def format_for_ai_analysis(messages, chat_id, date):
     conversation_data = {
         "metadata": {
             "chat_id": chat_id,
-            "export_date": date.strftime("%Y-%m-%d"),
+            "export_date": export_time.strftime("%Y-%m-%d"),
             "total_messages": total_messages,
             "unique_participants": len(users),
             "time_range": {
@@ -215,7 +215,7 @@ def format_for_ai_analysis(messages, chat_id, date):
 @log_command()
 @bot_started()
 async def export_chat_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Export today's messages in an AI-optimized JSON format for conversation analysis"""
+    """Export ALL available messages for this chat in an AI-optimized JSON format"""
     chat_id = update.effective_chat.id
     user = update.effective_user
 
@@ -224,57 +224,35 @@ async def export_chat_command(update: Update, context: ContextTypes.DEFAULT_TYPE
     logger.debug(f"User: {user.first_name} {user.last_name} (@{user.username})")
 
     try:
-        # Use consistent timezone handling as in other commands
         madrid_tz = pytz.timezone("Europe/Madrid")
-        today = datetime.now(madrid_tz).date()
+        export_time = datetime.now(madrid_tz)
 
-        logger.debug(f"Exporting messages for date: {today}")
+        logger.debug("Fetching ALL available messages for this chat...")
 
-        # Try the specific date method first
-        logger.debug("Fetching messages for specific date...")
-        messages = await db_service.get_messages_for_date(chat_id, today)
-        logger.debug(f"Messages found for date method: {len(messages)}")
-
-        # If no messages found with the date method, try getting messages from the last 24 hours
-        # and filter them manually to today's date
-        if not messages:
-            logger.debug("No messages found with date method, trying 24h fallback...")
-            recent_24h = await db_service.get_recent_messages(chat_id, hours=24, limit=1000)
-            logger.debug(f"Messages in last 24 hours: {len(recent_24h)}")
-
-            # Filter to today's messages manually
-            messages = []
-            for msg in recent_24h:
-                try:
-                    created_utc = datetime.fromisoformat(msg["created_at"]).replace(tzinfo=pytz.UTC)
-                    created_madrid = created_utc.astimezone(madrid_tz)
-                    msg_date = created_madrid.date()
-
-                    if msg_date == today:
-                        messages.append(msg)
-
-                except Exception as date_error:
-                    logger.warning(f"Error parsing message date: {date_error}")
-                    continue
-
-            logger.debug(f"Messages filtered to today: {len(messages)}")
+        # Get ALL messages for this chat (no date restrictions)
+        # Use a high limit to get everything available
+        messages = await db_service.get_recent_messages(chat_id, limit=10000)
+        logger.debug(f"Total messages found: {len(messages)}")
 
         if not messages:
-            logger.info(f"No messages found for export - Chat: {chat_id}, Date: {today}")
+            logger.info(f"No messages found for export - Chat: {chat_id}")
             await update.message.reply_text(
                 f"{ERROR_MESSAGES['NO_MESSAGES']}\n\n"
-                f"🔍 *Debug info:*\n"
-                f"• Fecha buscada: {today.strftime('%d/%m/%Y')}\n"
-                f"• Zona horaria: Europe/Madrid",
+                f"🔍 *No hay mensajes en este chat para exportar.*",
                 parse_mode="Markdown"
             )
             return
 
         logger.debug(f"Found {len(messages)} messages for export")
-        logger.debug("Processing messages for AI analysis format...")
+        logger.debug("Processing ALL messages for AI analysis format...")
 
         # Format messages for AI analysis
-        conversation_data = format_for_ai_analysis(messages, chat_id, today)
+        conversation_data = format_for_ai_analysis(messages, chat_id, export_time)
+
+        # Update metadata to reflect that this is a full export
+        conversation_data["metadata"]["export_type"] = "full_chat_history"
+        conversation_data["metadata"]["export_timestamp"] = export_time.strftime("%Y-%m-%d %H:%M")
+        conversation_data["metadata"]["note"] = "Contains all available messages in database (auto-cleaned by scheduler)"
 
         logger.debug(f"Processed conversation data: {len(conversation_data['conversation_flow'])} messages, {len(conversation_data['conversation_threads'])} threads")
 
@@ -295,20 +273,20 @@ async def export_chat_command(update: Update, context: ContextTypes.DEFAULT_TYPE
         try:
             logger.debug("Sending document to user...")
             with open(tmp_path, "rb") as doc:
-                # Generate filename with date for clarity
-                filename = f"chat_analysis_{today.strftime('%Y-%m-%d')}.json"
+                # Generate filename with timestamp
+                filename = f"chat_full_export_{export_time.strftime('%Y%m%d_%H%M')}.json"
 
                 participants_count = conversation_data["metadata"]["unique_participants"]
                 threads_count = len(conversation_data["conversation_threads"])
                 duration = conversation_data["metadata"]["time_range"]["duration_hours"]
 
                 caption = (
-                    f"🧠 **Análisis de conversación** - {today.strftime('%d/%m/%Y')}\n"
-                    f"• {len(messages)} mensajes\n"
+                    f"🧠 **Exportación completa del chat**\n"
+                    f"• {len(messages)} mensajes totales\n"
                     f"• {participants_count} participantes\n"
                     f"• {threads_count} hilos de conversación\n"
-                    f"• {duration:.1f} horas de duración\n\n"
-                    f"📋 *Optimizado para análisis por IA*"
+                    f"• {duration:.1f} horas de conversación\n\n"
+                    f"📋 *Todo el historial disponible - Optimizado para IA*"
                 )
 
                 await context.bot.send_document(
@@ -320,7 +298,7 @@ async def export_chat_command(update: Update, context: ContextTypes.DEFAULT_TYPE
                 )
 
             logger.info(f"=== EXPORT CHAT COMMAND COMPLETED for user {user.id} in chat {chat_id} ===")
-            logger.info(f"Exported {len(messages)} messages in AI-optimized format for date {today}")
+            logger.info(f"Exported {len(messages)} total messages in AI-optimized format")
 
         except Exception as send_error:
             logger.error(f"Error sending document: {send_error}", exc_info=True)

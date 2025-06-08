@@ -25,7 +25,7 @@ HELP_MESSAGE = (
     "• `/help` - Si eres tan corto que necesitas ayuda, aquí tienes esta parrafada. ¡Léetela!\n"
     "• `/summarize` - El puto amo de los comandos. Te resume lo que sea. ¡Pídele y calla!\n"
     "• `/configurar_resumen` - Personaliza el tono, longitud, idioma y programa resúmenes diarios. ¡Ponlo a tu gusto!\n"
-    "• `/export_chat` - Te saco un JSON con los mensajes del día. Si necesitas analizar la movida, aquí lo tienes.\n\n"
+    "• `/export_chat` - Te exporto TODO el historial disponible del chat en formato JSON optimizado para IA. Perfecto para analizar debates largos.\n\n"
     "🔹 **Cómo usar `/summarize` sin parecer un paquete:**\n"
     "• **Resumir el chat como un vago (Operación Simple):**\n"
     "  Tira un `/summarize` y déjalo que se curre los últimos mensajes del chat (hasta 300). ¡Menos leer para ti, fenómeno!\n\n"
