@@ -77,12 +77,34 @@ async def configure_summary_callback(update: Update, context: ContextTypes.DEFAU
 
                 # If daily_summary_hour changed, update scheduler
                 if field == 'daily_summary_hour':
+                    logger.debug(f"Daily summary hour changed to {value} for chat {chat_id}")
                     try:
                         from bot.services.scheduler_service import scheduler_service
+
+                        # Check if scheduler is running before attempting update
+                        if not scheduler_service.scheduler.running:
+                            logger.error(f"Scheduler is not running, cannot update job for chat {chat_id}")
+                            await query.answer("⚠️ Configuración guardada, pero el programador no está activo. Contacta al administrador.", show_alert=True)
+                            return
+
                         scheduler_service.update_daily_summary_job(chat_id, value)
-                        logger.info(f"Updated daily summary schedule for chat {chat_id} to {value}")
+                        logger.info(f"✅ Successfully updated daily summary schedule for chat {chat_id} to {value}")
+
+                        # Verify the job was created/updated
+                        if value != 'off':
+                            job_id = f"daily_summary_{chat_id}"
+                            job = scheduler_service.scheduler.get_job(job_id)
+                            if job:
+                                logger.debug(f"Scheduler job verification successful: {job.next_run_time}")
+                            else:
+                                logger.error(f"Scheduler job verification failed for chat {chat_id}")
+                                await query.answer("⚠️ Configuración guardada, pero hubo un problema con el programador. Contacta al administrador.", show_alert=True)
+                                return
+
                     except Exception as e:
-                        logger.warning(f"Failed to update scheduler for chat {chat_id}: {e}")
+                        logger.error(f"❌ Failed to update scheduler for chat {chat_id}: {e}", exc_info=True)
+                        await query.answer("⚠️ Configuración guardada, pero hubo un problema con el programador. Contacta al administrador.", show_alert=True)
+                        return
 
                 # Return to main menu
                 await show_main_menu(query, context)

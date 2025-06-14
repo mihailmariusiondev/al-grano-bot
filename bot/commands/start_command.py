@@ -40,6 +40,39 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await db_service.update_chat_state(chat_id, {"is_bot_started": True})
         logger.debug("Chat state updated: is_bot_started = True")
 
+        # Auto-enable daily summaries for group chats
+        if update.effective_chat.type in ['group', 'supergroup']:
+            logger.debug("Group chat detected, enabling daily summaries by default...")
+            try:
+                # Get or create chat summary config with daily summary enabled
+                config = await db_service.get_chat_summary_config(chat_id)
+
+                # If daily summary is off, enable it with default hour (03:00)
+                if config.get('daily_summary_hour') == 'off':
+                    logger.debug("Daily summary was off, enabling with default hour 03:00...")
+                    success = await db_service.update_chat_summary_config(
+                        chat_id,
+                        {'daily_summary_hour': '03'}
+                    )
+
+                    if success:
+                        logger.info(f"Daily summaries auto-enabled for group chat {chat_id}")
+
+                        # Update scheduler
+                        try:
+                            from bot.services.scheduler_service import scheduler_service
+                            scheduler_service.update_daily_summary_job(chat_id, '03')
+                            logger.info(f"Scheduler job added for chat {chat_id} at 03:00")
+                        except Exception as scheduler_error:
+                            logger.error(f"Failed to add scheduler job for chat {chat_id}: {scheduler_error}")
+                    else:
+                        logger.warning(f"Failed to auto-enable daily summaries for chat {chat_id}")
+                else:
+                    logger.debug(f"Daily summary already configured for chat {chat_id}: {config.get('daily_summary_hour')}")
+
+            except Exception as config_error:
+                logger.error(f"Error configuring daily summaries for chat {chat_id}: {config_error}")
+
         logger.debug("Sending welcome message...")
         # Send welcome message
         await update.message.reply_text(START_MESSAGE)

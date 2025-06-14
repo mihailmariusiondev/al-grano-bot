@@ -28,12 +28,13 @@ class SchedulerService:
             if not self.scheduler.running:
                 logger.debug("Scheduler not running, initializing...")
 
-                # Load all configured daily summary jobs
-                logger.debug("Loading daily summary jobs from database...")
-                await self._load_daily_summary_jobs()
-
+                # Start APScheduler FIRST
                 logger.debug("Starting APScheduler...")
                 self.scheduler.start()
+
+                # THEN load all configured daily summary jobs
+                logger.debug("Loading daily summary jobs from database...")
+                await self._load_daily_summary_jobs()
 
                 # Log current jobs
                 jobs = self.get_scheduled_jobs()
@@ -89,8 +90,20 @@ class SchedulerService:
             chat_id: The chat ID
             hour: The hour to send the summary ('00', '03', '08', '12', '18', '21')
         """
+        logger.debug(f"=== ADDING DAILY SUMMARY JOB ===")
+        logger.debug(f"Chat ID: {chat_id}, Hour: {hour}")
+
         try:
+            # Validate hour format
+            if not hour.isdigit() or not (0 <= int(hour) <= 23):
+                raise ValueError(f"Invalid hour format: {hour}. Must be 00-23")
+
             job_id = f"daily_summary_{chat_id}"
+
+            # Check if scheduler is running
+            if not self.scheduler.running:
+                logger.warning(f"Scheduler not running, cannot add job for chat {chat_id}")
+                raise RuntimeError("Scheduler is not running")
 
             # Create a cron trigger for the specified hour (Madrid timezone)
             trigger = CronTrigger(
@@ -98,12 +111,19 @@ class SchedulerService:
                 minute=0,
                 timezone=pytz.timezone("Europe/Madrid")
             )
+            logger.debug(f"Created cron trigger for {hour}:00 Madrid time")
 
             # Import here to avoid circular imports
             from bot.services.daily_summary_service import send_daily_summary_for
 
-            # Add the job (replace if already exists)
-            self.scheduler.add_job(
+            # Remove existing job if present
+            existing_job = self.scheduler.get_job(job_id)
+            if existing_job:
+                logger.debug(f"Removing existing job {job_id}")
+                self.scheduler.remove_job(job_id)
+
+            # Add the job
+            job = self.scheduler.add_job(
                 send_daily_summary_for,
                 trigger=trigger,
                 id=job_id,
@@ -112,10 +132,19 @@ class SchedulerService:
                 args=[chat_id]
             )
 
-            logger.info(f"Added daily summary job for chat {chat_id} at {hour}:00")
+            logger.info(f"✅ Successfully added daily summary job for chat {chat_id} at {hour}:00")
+            logger.debug(f"Job next run time: {job.next_run_time}")
+
+            # Verify job was added
+            verify_job = self.scheduler.get_job(job_id)
+            if verify_job:
+                logger.debug(f"Job verification successful: {verify_job.id}")
+            else:
+                logger.error(f"Job verification failed: job {job_id} not found after adding")
 
         except Exception as e:
-            logger.error(f"Error adding daily summary job for chat {chat_id}: {e}", exc_info=True)
+            logger.error(f"❌ Error adding daily summary job for chat {chat_id}: {e}", exc_info=True)
+            raise
 
     def remove_daily_summary_job(self, chat_id: int):
         """Remove the daily summary job for a specific chat.
