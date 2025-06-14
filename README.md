@@ -4,167 +4,328 @@
 
 ## 🌟 Características Principales
 
-- **Resúmenes de Chat Inteligentes**:
-  - Genera resúmenes de los últimos mensajes en un chat grupal (hasta 300 mensajes).
-  - Permite a los administradores elegir entre resúmenes **largos y detallados** o **cortos y concisos** para el chat.
-- **Resúmenes de Contenido Específico (usando `/summarize` en respuesta a un mensaje)**:
-  - **Mensajes de texto**: Resume el texto del mensaje citado.
-  - **Vídeos de YouTube**: Extrae la transcripción (si está disponible) y la resume.
-  - **Artículos web**: Extrae el contenido principal del artículo y lo resume.
-  - **Mensajes de voz y archivos de audio**: Transcribe el audio y luego resume la transcripción.
-  - **Vídeos y notas de vídeo de Telegram**: Extrae el audio, lo transcribe y resume la transcripción.
-  - **Documentos (PDF, DOCX, TXT)**: Extrae el texto del documento y lo resume. Capaz de manejar documentos grandes mediante división en fragmentos.
-- **Resúmenes Diarios Automatizados**:
-  - Opción para administradores de activar/desactivar un resumen diario automático de la actividad del chat (enviado a las 3 AM hora de Madrid).
-- **Gestión de Uso y Límites (para usuarios no administradores)**:
-  - **Operaciones Simples** (resumir chat, texto, enlaces a YouTube/artículos con transcripción/extracción directa): Cooldown entre usos.
-  - **Operaciones Avanzadas** (transcribir audio/video, procesar documentos): Cooldown más largo y límite diario de operaciones.
-  - Los administradores no tienen estas limitaciones.
-- **Procesamiento Multimedia y de Contenido**:
-  - Utiliza `ffmpeg` para la compresión de audio (a Opus) y extracción de audio de vídeos (a WAV PCM).
-  - Integración con **OpenRouter API** (usando modelos como `deepseek/deepseek-r1:free`) para la generación de todos los resúmenes.
-  - Integración con la **API directa de OpenAI** (modelo `whisper-1`) exclusivamente para la transcripción de audio.
-  - Prompts del sistema para la IA externalizados y gestionados de forma modular.
-- **Interfaz Amigable**:
-  - Comandos intuitivos (`/start`, `/help`, `/summarize`).
-  - Mensajes de progreso durante operaciones largas.
-  - Mensajes de ayuda detallados accesibles con `/help`.
-  - Exporta todo el historial del chat en formato JSON optimizado para IA con `/export_chat`.
-- **Administración del Bot**:
-  - Interfaz de configuración `/configurar_resumen` con permisos administrativos para cambiar configuraciones del chat.
-  - Los administradores pueden ser definidos automáticamente a través de una variable de entorno.
-- **Persistencia de Datos**:
-  - Almacena mensajes (para resúmenes de chat), estados de chat y datos de usuario (para gestión de límites) en una base de datos SQLite.
-  - Limpieza automática de mensajes antiguos para mantener un histórico relevante.
-- **Logging y Manejo de Errores**:
-  - Sistema de logging detallado.
-  - Manejador de errores global que notifica a los administradores en caso de problemas críticos.
+### **Resúmenes de Chat Inteligentes**
+
+- Genera resúmenes de los últimos 300 mensajes en un chat grupal
+- Ofrece una interfaz de configuración completa con `/configurar_resumen` para personalizar los resúmenes
+- Resúmenes diarios automáticos programables
+
+### **Resúmenes de Contenido Específico**
+
+Al responder a un mensaje con `/summarize`, el bot puede procesar:
+
+- **Mensajes de texto**: Resume el contenido del mensaje citado
+- **Vídeos de YouTube**: Extrae la transcripción (si está disponible) y la resume
+- **Artículos web**: Extrae el contenido principal del artículo y lo resume
+- **Mensajes de voz y archivos de audio**: Transcribe el audio usando Whisper y resume la transcripción
+- **Vídeos y notas de vídeo de Telegram**: Extrae el audio, lo transcribe con Whisper y resume el contenido
+- **Documentos (PDF, DOCX, TXT)**: Extrae el texto del documento y lo resume, con capacidad de procesar documentos grandes mediante estrategia de "map-reduce"
+
+### **Configuración Personalizada por Chat**
+
+El comando `/configurar_resumen` abre un menú interactivo multiidioma para ajustar:
+
+- **🧠 Tono**:
+
+  - Neutral 🧾 - Objetivo y profesional
+  - Informal 🙂 - Casual y amigable
+  - Sarcástico 😈 - Con ironía y mordacidad
+  - **Colega 🗣️** - Como ese amigo sarcástico que te cuenta qué pasó (¡modo exclusivo!)
+  - Irónico 🙃 - Señalando contradicciones con inteligencia
+  - Absurdo 🤪 - Surrealista con metáforas extrañas
+
+- **📏 Longitud**: Corto (2-3 frases), Medio (5-7 frases), Largo (10-15 frases)
+- **🌐 Idioma**: Español 🇪🇸, English 🇺🇸, Français 🇫🇷, Português 🇧🇷
+- **👥 Inclusión de Nombres**: Decide si los resúmenes deben mencionar a los participantes
+- **⏰ Resúmenes Diarios**: Activa, desactiva y programa resúmenes automáticos (00:00, 03:00, 08:00, 12:00, 18:00, 21:00)
+
+### **Exportación de Chat para IA**
+
+- El comando `/export_chat` genera un archivo `.json` optimizado para análisis por IA
+- Incluye metadatos completos, estadísticas de participación, hilos de conversación reconstruidos y transcripción cronológica
+- Formato estructurado para facilitar el análisis posterior con herramientas de IA
+
+### **Sistema de Gestión de Uso**
+
+Para usuarios no administradores:
+
+- **Operaciones Simples** (resumir chat, texto, enlaces): Cooldown de 2 minutos
+- **Operaciones Avanzadas** (transcribir audio/video, procesar documentos): Cooldown de 10 minutos y límite de 5 usos diarios
+- Los administradores del bot no tienen limitaciones
+- Tamaño máximo de archivo: 20MB
+
+### **Procesamiento Multimedia Avanzado**
+
+- Integración con **ffmpeg** para compresión de audio (Opus) y extracción de audio de vídeos (WAV PCM)
+- Transcripción de alta calidad usando **OpenAI Whisper** (modelo `whisper-1`)
+- Soporte para múltiples formatos de audio y video
+
+### **Arquitectura de IA Híbrida**
+
+- **OpenRouter API**: Para generación de resúmenes (modelos como `deepseek/deepseek-r1-0528-qwen3-8b`)
+- **OpenAI API directa**: Exclusivamente para transcripción con Whisper
+- Sistema de prompts modular y personalizable
+
+### **Características Técnicas Avanzadas**
+
+- **Base de datos SQLite** con limpieza automática de mensajes antiguos
+- **Sistema de logging** detallado con manejo de errores global
+- **Programador de tareas** (APScheduler) para resúmenes diarios
+- **Manejo robusto de errores** con reintentos automáticos para problemas de formato
+- **Interfaz multiidioma** completa
+- **Decoradores personalizados** para logging, permisos y control de límites
 
 ## 🛠️ Tecnologías Utilizadas
 
-- **Lenguaje**: Python 3.12
-- **Framework del Bot**: `python-telegram-bot`
-- **IA y NLP**:
-  - **OpenRouter API**: Para generación de resúmenes (e.g., usando modelos `deepseek/deepseek-r1:free`).
-  - **OpenAI API (directa)**: Exclusivamente para transcripción de audio con `whisper-1`.
-- **Base de Datos**: SQLite (con `aiosqlite` para operaciones asíncronas)
-- **Procesamiento Multimedia**: `ffmpeg`
-- **Extracción de Contenido**:
-  - `youtube-transcript-api` (para transcripciones de YouTube)
-  - `readability-lxml` (para contenido de artículos web)
-  - `python-docx` (para archivos `.docx`)
-  - `PyPDF2` (para archivos `.pdf`)
-- **Programación de Tareas**: `APScheduler` (para resúmenes diarios)
-- **Gestión de Entorno**: Conda y Pip
-- **Otros**: `python-dotenv` (variables de entorno), `pytz` (zonas horarias), `asyncio`.
+### **Core Framework**
+
+- **Python 3.12** - Lenguaje base
+- **python-telegram-bot** - Framework del bot
+- **aiosqlite** - Base de datos asíncrona SQLite
+
+### **Inteligencia Artificial**
+
+- **OpenRouter API** - Generación de resúmenes con modelos avanzados
+- **OpenAI API** - Transcripción de audio con Whisper
+- **Sistema de prompts modular** - Configuración flexible de comportamiento de IA
+
+### **Procesamiento de Contenido**
+
+- **ffmpeg** - Procesamiento multimedia
+- **youtube-transcript-api** - Transcripciones de YouTube
+- **python-readability** - Extracción de contenido web
+- **python-docx** - Procesamiento de documentos Word
+- **PyPDF2** - Procesamiento de documentos PDF
+
+### **Servicios y Utilidades**
+
+- **APScheduler** - Programación de tareas
+- **python-dotenv** - Gestión de variables de entorno
+- **pytz** - Manejo de zonas horarias
+- **certifi** - Certificados SSL
 
 ## 📋 Requisitos Previos
 
-- Python 3.12 o superior.
-- Conda (recomendado para gestionar el entorno).
-- `ffmpeg` instalado y accesible en el PATH del sistema.
-- Una cuenta de Telegram y un token de bot.
-- Una clave de API para OpenRouter.
-- Una clave de API para OpenAI (específicamente para el uso del modelo Whisper).
+- **Python 3.12** o superior
+- **Conda** (recomendado para gestión del entorno)
+- **ffmpeg** instalado y accesible en el PATH del sistema
+- **Token de bot de Telegram**
+- **Clave de API de OpenRouter**
+- **Clave de API de OpenAI** (para Whisper)
 
 ## 🚀 Configuración e Instalación
 
-1.  **Clonar el Repositorio**:
+### 1. **Clonar el Repositorio**
 
-    ```bash
-    git clone https://github.com/mihailmariusiondev/al-grano-bot.git
-    cd al-grano-bot
-    ```
+```bash
+git clone https://github.com/mihailmariusiondev/al-grano-bot.git
+cd al-grano-bot
+```
 
-2.  **Crear y Activar el Entorno Conda**:
+### 2. **Crear y Activar el Entorno Conda**
 
-    ```bash
-    conda env create -f environment.yml
-    conda activate al-grano-bot
-    ```
+```bash
+conda env create -f environment.yml
+conda activate al-grano-bot
+```
 
-3.  **Configurar Variables de Entorno**:
-    Crea un archivo `.env` en la raíz del proyecto y añade tus credenciales:
+### 3. **Configurar Variables de Entorno**
 
-    ```env
-    BOT_TOKEN="TU_TOKEN_DE_TELEGRAM"
-    OPENROUTER_API_KEY="TU_CLAVE_DE_API_DE_OPENROUTER"
-    OPENAI_API_KEY="TU_CLAVE_DE_API_DE_OPENAI_PARA_WHISPER" # Usada para transcripciones con Whisper
+Crea un archivo `.env` en la raíz del proyecto:
 
-    # Opcionales para OpenRouter (valores por defecto o ejemplos mostrados)
-    # OPENROUTER_SITE_URL="https://github.com/mihailmariusiondev/al-grano-bot"
-    # OPENROUTER_SITE_NAME="Al-Grano Bot"
-    # OPENROUTER_PRIMARY_MODEL="deepseek/deepseek-r1:free"
-    # OPENROUTER_FALLBACK_MODEL="deepseek/deepseek-r1"
+```env
+# --- OBLIGATORIAS ---
+BOT_TOKEN="TU_TOKEN_DE_TELEGRAM"
+OPENROUTER_API_KEY="TU_CLAVE_DE_API_DE_OPENROUTER"
+OPENAI_API_KEY="TU_CLAVE_DE_API_DE_OPENAI"
 
-    # Opcionales (valores por defecto mostrados)
-    # DB_PATH="bot.db"
-    # LOG_LEVEL="INFO"
-    # AUTO_ADMIN_USER_IDS_CSV="ID_USUARIO_1,ID_USUARIO_2" # IDs de Telegram separados por comas
-    ```
+# --- OPCIONALES (valores por defecto mostrados) ---
+# Administradores del bot (IDs de Telegram separados por comas)
+# AUTO_ADMIN_USER_IDS_CSV="ID_USUARIO_1,ID_USUARIO_2"
 
-    _Nota: `OPENAI_API_KEY` se utiliza específicamente para las llamadas al servicio de transcripción Whisper de OpenAI. Todos los resúmenes se generan a través de OpenRouter._
+# Configuración de base de datos
+# DB_PATH="bot.db"
 
-4.  **(Opcional) Asignar Administradores Automáticos**:
-    Puedes configurar la variable `AUTO_ADMIN_USER_IDS_CSV` en tu archivo `.env` con una lista de IDs de usuario de Telegram separados por comas. Estos usuarios serán configurados como administradores automáticamente al iniciar el bot. Alternativamente, puedes asignar administradores manualmente en la base de datos (`telegram_user` tabla, campo `is_admin = 1`) después de que el bot haya interactuado con ellos.
+# Nivel de logging
+# LOG_LEVEL="INFO"
+
+# Configuración OpenRouter
+# OPENROUTER_SITE_URL="https://github.com/mihailmariusiondev/al-grano-bot"
+# OPENROUTER_SITE_NAME="Al-Grano Bot"
+# OPENROUTER_PRIMARY_MODEL="deepseek/deepseek-r1-0528-qwen3-8b:free"
+# OPENROUTER_FALLBACK_MODEL="deepseek/deepseek-r1-0528-qwen3-8b"
+```
+
+### 4. **Configurar Administradores**
+
+Los usuarios especificados en `AUTO_ADMIN_USER_IDS_CSV` recibirán automáticamente permisos de administrador, eximiéndolos de todos los límites de uso.
 
 ## ▶️ Uso
 
-1.  **Iniciar el Bot**:
+### **Iniciar el Bot**
 
-    ```bash
-    python main.py
-    ```
+```bash
+python main.py
+```
 
-2.  **Comandos Disponibles en Telegram** (extraído y adaptado del comando `/help` del bot):
+### **Comandos Disponibles**
 
-    - `/start`: Inicia el bot en el chat. Registra el chat y el usuario.
-    - `/help`: Muestra una guía de ayuda detallada con todos los comandos y funcionalidades.
-    - `/summarize`:
-      - **Sin responder a un mensaje (Operación Simple)**: Genera un resumen de los últimos mensajes del chat (hasta 300). _Cooldown: 2 minutos para usuarios no admins._
-      - **Respondiendo a un mensaje (Operación Simple o Avanzada)**:
-        - **Texto simple, enlaces a YouTube, artículos web**: _Cooldown: 2 minutos para usuarios no admins._
-        - **Archivos de Audio/Voz, Vídeos/Notas de Vídeo, Documentos (PDF, DOCX, TXT)**: Considerado "Operación Avanzada". _Cooldown: 10 minutos y límite de 5 operaciones/día para usuarios no admins._
-    - `/configurar_resumen`: Personaliza la configuración de resúmenes (tono, longitud, idioma, inclusión de nombres, resúmenes diarios automáticos). Los administradores pueden cambiar la configuración del chat.
-    - `/export_chat`: Envía un archivo `.json` con todo el historial disponible del chat, optimizado para análisis por IA.
+| Comando               | Descripción                                                                                                                        |
+| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `/start`              | Inicia el bot en el chat y activa la configuración por defecto                                                                     |
+| `/help`               | Muestra una guía detallada con todos los comandos y funcionalidades                                                                |
+| `/summarize`          | **Comando principal** - Sin responder: resume últimos mensajes del chat<br>Respondiendo a mensaje: resume ese contenido específico |
+| `/configurar_resumen` | Abre el menú interactivo de configuración (solo administradores)                                                                   |
+| `/export_chat`        | Envía archivo JSON con historial completo optimizado para IA                                                                       |
 
-    **Nota sobre límites (para usuarios no administradores):**
+### **Tipos de Contenido Soportados**
 
-    - Operaciones simples (resumir chat, texto, enlaces): Tienen un cooldown corto.
-    - Operaciones avanzadas (transcribir audio/video, procesar documentos): Tienen un cooldown más largo y un límite diario de usos.
-    - Los administradores no están sujetos a estos cooldowns o límites.
-    - Tamaño máximo de archivo para procesamiento: 20MB.
+#### **Audio y Video**
 
-## 📂 Estructura del Proyecto (Simplificada)
+- Formatos soportados: MP3, MP4, OGG, WAV, WebM, MOV
+- Transcripción automática con OpenAI Whisper
+- Compresión inteligente para optimizar procesamiento
+
+#### **Documentos**
+
+- **PDF**: Extracción completa de texto
+- **DOCX**: Procesamiento de documentos Word
+- **TXT**: Archivos de texto plano
+- **Estrategia Map-Reduce**: Para documentos grandes
+
+#### **Web y YouTube**
+
+- **YouTube**: Transcripciones automáticas cuando están disponibles
+- **Artículos web**: Extracción inteligente de contenido principal
+- **Enlaces**: Procesamiento automático de URLs
+
+### **Sistema de Límites**
+
+#### **Para Usuarios Regulares**
+
+- **Operaciones Simples**: Cooldown de 2 minutos
+  - Resumir chat
+  - Resumir texto
+  - Resumir enlaces web
+- **Operaciones Avanzadas**: Cooldown de 10 minutos + 5 usos diarios
+  - Transcribir audio/video
+  - Procesar documentos
+
+#### **Para Administradores**
+
+- Sin cooldowns
+- Sin límites diarios
+- Acceso completo a todas las funcionalidades
+
+## 📂 Estructura del Proyecto
 
 ```
 al-grano-bot/
 ├── bot/
-│   ├── commands/         # Lógica para los comandos del bot (/start, /summarize, etc.)
-│   ├── handlers/         # Manejadores para tipos de contenido (audio, video, docs, etc.)
-│   ├── prompts/          # Prompts del sistema para la IA
-│   ├── services/         # Servicios de negocio (IA, base de datos, scheduler)
-│   ├── utils/            # Utilidades (logger, decoradores, formateo, constantes)
-│   ├── __init__.py
-│   ├── bot.py            # Lógica principal del bot, registro de handlers
-│   └── config.py         # Carga de configuración
-├── logs/                 # Archivos de log (creados en ejecución)
-├── .env                  # Archivo de variables de entorno (debes crearlo)
-├── environment.yml       # Definición del entorno Conda
-├── main.py              # Punto de entrada de la aplicación
-└── README.md            # Este archivo
+│   ├── callbacks/              # Lógica de menús interactivos
+│   │   └── configure_summary_callback.py
+│   ├── commands/               # Comandos del bot
+│   │   ├── start_command.py
+│   │   ├── help_command.py
+│   │   ├── summarize_command.py
+│   │   ├── configure_summary_command.py
+│   │   ├── export_chat_command.py
+│   │   └── message_handler.py
+│   ├── handlers/               # Procesadores de contenido
+│   │   ├── article_handler.py
+│   │   ├── audio_handler.py
+│   │   ├── document_handler.py
+│   │   ├── video_handler.py
+│   │   ├── youtube_handler.py
+│   │   └── error_handler.py
+│   ├── prompts/                # Sistema de prompts modular
+│   │   ├── base_prompts.py
+│   │   └── prompt_modifiers.py
+│   ├── services/               # Lógica de negocio
+│   │   ├── openai_service.py
+│   │   ├── database_service.py
+│   │   ├── message_service.py
+│   │   ├── scheduler_service.py
+│   │   └── daily_summary_service.py
+│   ├── utils/                  # Utilidades
+│   │   ├── constants.py
+│   │   ├── decorators.py
+│   │   ├── format_utils.py
+│   │   ├── logger.py
+│   │   ├── media_utils.py
+│   │   ├── text_utils.py
+│   │   └── get_message_type.py
+│   ├── bot.py                  # Lógica principal del bot
+│   └── config.py               # Gestión de configuración
+├── logs/                       # Archivos de log (generados automáticamente)
+├── .env                        # Variables de entorno (crear manualmente)
+├── environment.yml             # Definición del entorno Conda
+├── main.py                     # Punto de entrada
+└── README.md                   # Este archivo
 ```
+
+## 🔧 Características Técnicas Avanzadas
+
+### **Base de Datos**
+
+- **SQLite** con operaciones asíncronas
+- **Limpieza automática** de mensajes antiguos
+- **Triggers SQL** para mantenimiento automático
+- **Gestión de esquemas** con migraciones automáticas
+
+### **Sistema de Logging**
+
+- **Logs estructurados** con diferentes niveles
+- **Rotación automática** de archivos
+- **Notificaciones de errores** a administradores
+
+### **Gestión de Memoria**
+
+- **Procesamiento por lotes** para operaciones grandes
+- **Limpieza automática** de archivos temporales
+- **Optimización** para documentos grandes
+
+### **Seguridad**
+
+- **Validación de archivos** por tipo MIME
+- **Límites de tamaño** configurables
+- **Sanitización de inputs** para prevenir inyecciones
 
 ## 🤝 Contribuciones
 
-Las contribuciones son bienvenidas. Por favor, abre un _issue_ para discutir cambios importantes o envía un _pull request_.
+Las contribuciones son bienvenidas. Por favor:
+
+1. Fork el repositorio
+2. Crea una rama para tu feature (`git checkout -b feature/AmazingFeature`)
+3. Commit tus cambios (`git commit -m 'Add some AmazingFeature'`)
+4. Push a la rama (`git push origin feature/AmazingFeature`)
+5. Abre un Pull Request
 
 ## 📝 Licencia
 
-Este proyecto está bajo la Licencia MIT.
+Este proyecto está bajo la **Licencia MIT**. Ver el archivo `LICENSE` para más detalles.
 
 ## 👨‍💻 Autor
 
-Este bot ha sido creado por **Mihail Marius Ion ([@Arkantos2374](https://t.me/Arkantos2374))**.
+**Mihail Marius Ion** ([@Arkantos2374](https://t.me/Arkantos2374))
 
-Si deseas apoyar el desarrollo y mantenimiento del bot, puedes considerar una donación vía [PayPal](https://paypal.me/mariusmihailion).
+### 💖 Apoyo al Proyecto
+
+Si Al-Grano Bot te resulta útil y quieres apoyar su desarrollo y mantenimiento:
+
+[![PayPal](https://img.shields.io/badge/PayPal-00457C?style=for-the-badge&logo=paypal&logoColor=white)](https://paypal.me/mariusmihailion)
+
+---
+
+## 📊 Estadísticas del Proyecto
+
+- **Idiomas soportados**: 4 (Español, Inglés, Francés, Portugués)
+- **Formatos de archivo**: 10+ tipos diferentes
+- **Tonos de resumen**: 6 opciones únicas
+- **APIs integradas**: OpenRouter + OpenAI
+- **Arquitectura**: Modular y escalable
+- **Tipo de base de datos**: SQLite con operaciones asíncronas
+
+---
+
+_¡Obtén tus resúmenes al grano con la potencia de la IA! 🚀_
