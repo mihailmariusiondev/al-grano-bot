@@ -658,6 +658,17 @@ class DatabaseService:
             self.logger.error(f"Error fetching admin users: {e}")
             return []
 
+    async def is_user_admin(self, user_id: int) -> bool:
+        """Check if a user is a bot admin."""
+        try:
+            user = await self.fetch_one(
+                "SELECT is_admin FROM telegram_user WHERE user_id = ?", (user_id,)
+            )
+            return user and user["is_admin"] == 1
+        except Exception as e:
+            self.logger.error(f"Error checking admin status for user {user_id}: {e}")
+            return False
+
     async def get_chat_summary_config(self, chat_id: int) -> dict:
         """Get chat summary configuration, create with defaults if not exists.
 

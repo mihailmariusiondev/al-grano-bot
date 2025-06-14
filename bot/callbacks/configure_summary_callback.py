@@ -23,17 +23,20 @@ async def configure_summary_callback(update: Update, context: ContextTypes.DEFAU
         field = parts[1]  # tone, length, language, include_names, daily_summary_hour
         action = parts[2]  # open, back_main, or a specific value
 
+        # --- FIX START ---
         # Check permissions in group chats
-        if update.effective_chat.type in ['group', 'supergroup']:
+        is_bot_admin = await db_service.is_user_admin(user_id)
+        if not is_bot_admin and update.effective_chat.type in ['group', 'supergroup']:
             try:
-                user = await context.bot.get_chat_member(chat_id, user_id)
-                if user.status not in ['creator', 'administrator']:
+                member = await context.bot.get_chat_member(chat_id, user_id)
+                if member.status not in ['creator', 'administrator']:
                     await query.answer("❌ Solo los administradores pueden cambiar la configuración", show_alert=True)
                     return
             except Exception as e:
                 logger.warning(f"Failed to check user permissions: {e}")
                 await query.answer("❌ Error al verificar permisos", show_alert=True)
                 return
+        # --- FIX END ---
 
         # Get current config and language
         config = await db_service.get_chat_summary_config(chat_id)

@@ -6,6 +6,7 @@ from bot.utils.media_utils import compress_audio, get_file_size
 from bot.utils.logger import logger
 from contextlib import ExitStack
 import tempfile
+import os  # Necesario para os.path.getsize
 
 logger = logger.get_logger(__name__)
 
@@ -60,14 +61,21 @@ async def audio_handler(message: Message, context: CallbackContext) -> None:
                 try:
                     logger.debug("Starting file download")
                     await file.download_to_drive(custom_path=temp_file_path)
-                    downloaded_size = get_file_size(temp_file_path)
-                    logger.info(f"Audio downloaded successfully, size: {downloaded_size} bytes")
+
+                    # --- FIX START ---
+                    downloaded_size_bytes = os.path.getsize(temp_file_path)
+                    logger.info(f"Audio downloaded successfully, size: {get_file_size(temp_file_path)}")
 
                     logger.debug("Starting audio compression")
                     await compress_audio(temp_file_path, compressed_file_path)
-                    compressed_size = get_file_size(compressed_file_path)
-                    compression_ratio = compressed_size / downloaded_size if downloaded_size > 0 else 0
-                    logger.info(f"Audio compressed, new size: {compressed_size} bytes (ratio: {compression_ratio:.2f})")
+
+                    compressed_size_bytes = os.path.getsize(compressed_file_path)
+                    logger.info(f"Audio compressed, new size: {get_file_size(compressed_file_path)}")
+
+                    if downloaded_size_bytes > 0:
+                        compression_ratio = compressed_size_bytes / downloaded_size_bytes
+                        logger.info(f"Compression ratio: {compression_ratio:.2f}")
+                    # --- FIX END ---
 
                     logger.debug("Starting audio transcription")
                     transcription = await openai_service.transcribe_audio(compressed_file_path)
