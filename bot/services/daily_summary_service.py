@@ -112,19 +112,19 @@ async def send_daily_summary_for(chat_id: int):
         # Get chat configuration
         logger.debug("Retrieving chat summary configuration...")
         config = await db_service.get_chat_summary_config(chat_id)
-        logger.debug(f"Chat config: {config}")
-
-        # Get recent messages (last 24 hours)
+        logger.debug(f"Chat config: {config}")  # Get recent messages (last 24 hours)
         logger.debug("Retrieving recent messages (24 hours)...")
         messages = await db_service.get_recent_messages_by_time(chat_id, hours=24)
         messages_count = len(messages)
 
-        logger.debug(f"Retrieved {messages_count} messages from last 24 hours")
+        logger.info(
+            f"Found {messages_count} messages in the last 24 hours for chat {chat_id}."
+        )
 
         # Check if there are enough messages to summarize
         if messages_count < 5:
             logger.info(
-                f"Not enough messages ({messages_count}) for chat {chat_id}, skipping summary"
+                f"Skipping summary for chat {chat_id}: not enough messages ({messages_count})."
             )
             return
 

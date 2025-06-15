@@ -106,31 +106,43 @@ async def configure_summary_callback(
                         scheduler_service.update_daily_summary_job(chat_id, value)
                         logger.info(
                             f"✅ Successfully updated daily summary schedule for chat {chat_id} to {value}"
-                        )
-
-                        # Verify the job was created/updated and add next run time to confirmation
+                        )  # Verify the job was created/updated and add next run time to confirmation
                         confirm_text_details = ""
                         if value != "off":
                             job_id = f"daily_summary_{chat_id}"
                             job = scheduler_service.scheduler.get_job(job_id)
                             if job:
-                                logger.debug(
-                                    f"Scheduler job verification successful: {job.next_run_time}"
-                                )
                                 import pytz
+                                from datetime import datetime
 
-                                next_run_madrid = job.next_run_time.astimezone(
-                                    pytz.timezone("Europe/Madrid")
+                                next_run_utc = job.next_run_time
+                                madrid_tz = pytz.timezone("Europe/Madrid")
+                                next_run_madrid = next_run_utc.astimezone(madrid_tz)
+
+                                # Loguear con más detalle
+                                logger.info(
+                                    f"Scheduler job for chat {chat_id} VERIFIED. Next run: {next_run_madrid.strftime('%Y-%m-%d %H:%M:%S %Z')}"
                                 )
-                                confirm_text_details = f"\n*Próximo resumen:* {next_run_madrid.strftime('%d/%m a las %H:%M')}"
+
+                                # Añadir a la confirmación del usuario
+                                confirm_text_details = f"\n*Próximo resumen programado para:* {next_run_madrid.strftime('%d de %b a las %H:%M')}"
                             else:
                                 logger.error(
-                                    f"Scheduler job verification failed for chat {chat_id}"
-                                )  # Update the confirmation message with next run details
-                        if confirm_text_details:
-                            await query.answer(confirm_text + confirm_text_details)
+                                    f"Scheduler job verification FAILED for chat {chat_id}"
+                                )
+                                await query.answer(
+                                    "⚠️ Configuración guardada, pero hubo un problema al verificar el trabajo en el programador.",
+                                    show_alert=True,
+                                )
+                                return
+
+                        # Update the confirmation message with next run details
+                        if value == "off":
+                            final_confirm_text = confirm_text
                         else:
-                            await query.answer(confirm_text)
+                            final_confirm_text = confirm_text + confirm_text_details
+
+                        await query.answer(final_confirm_text)
 
                     except Exception as e:
                         logger.error(
