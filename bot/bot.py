@@ -27,11 +27,6 @@ from telegram import Update
 from telegram.ext import ContextTypes
 import asyncio
 
-async def obsolete_command_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handle obsolete commands by redirecting to the new configuration command."""
-    await update.message.reply_text(
-        "Este comando ya no existe. Usa /configurar_resumen para personalizar los resúmenes."
-    )
 
 class TelegramBot:
     _instance = None
@@ -66,7 +61,9 @@ class TelegramBot:
                 await db_service.close()
                 self.logger.info("Database service connection closed.")
             except Exception as e:
-                self.logger.error(f"Error closing database service during cleanup: {e}", exc_info=True)
+                self.logger.error(
+                    f"Error closing database service during cleanup: {e}", exc_info=True
+                )
         else:
             self.logger.info("Database service was already closed or not initialized.")
         self.logger.info("Custom cleanup via PTB post_shutdown finished.")
@@ -82,20 +79,16 @@ class TelegramBot:
         self.application.add_handler(CommandHandler("start", start_command))
         self.application.add_handler(CommandHandler("help", help_command))
         self.application.add_handler(CommandHandler("summarize", summarize_command))
-        self.application.add_handler(CommandHandler("configurar_resumen", configure_summary_command))
+        self.application.add_handler(
+            CommandHandler("configurar_resumen", configure_summary_command)
+        )
         self.application.add_handler(CommandHandler("export_chat", export_chat_command))
         self.logger.debug("Core command handlers registered")
-
-        # Obsolete command handlers
-        self.logger.debug("Registering obsolete command handlers...")
-        self.application.add_handler(CommandHandler("toggle_daily_summary", obsolete_command_handler))
-        self.application.add_handler(CommandHandler("toggle_summary_type", obsolete_command_handler))
-        self.logger.debug("Obsolete command handlers registered")
 
         # Callback handlers
         self.logger.debug("Registering callback handlers...")
         self.application.add_handler(
-            CallbackQueryHandler(configure_summary_callback, pattern=r'^cfg\|')
+            CallbackQueryHandler(configure_summary_callback, pattern=r"^cfg\|")
         )
         self.logger.debug("Callback handlers registered")
 
@@ -140,21 +133,25 @@ class TelegramBot:
                 .post_shutdown(self._custom_cleanup)
                 .build()
             )
-            self.logger.debug("Application builder configured with timeouts and cleanup")
+            self.logger.debug(
+                "Application builder configured with timeouts and cleanup"
+            )
 
             self.register_handlers()
             message_service.initialize(self.application.bot)
             self.logger.debug("Message service initialized")
 
             current_loop = asyncio.get_event_loop_policy().get_event_loop()
-            self.logger.debug(f"Current event loop running: {current_loop.is_running()}")
+            self.logger.debug(
+                f"Current event loop running: {current_loop.is_running()}"
+            )
 
             if current_loop.is_running():
-                 asyncio.create_task(self._start_scheduler())
-                 self.logger.debug("Scheduler started as async task")
+                asyncio.create_task(self._start_scheduler())
+                self.logger.debug("Scheduler started as async task")
             else:
-                 current_loop.run_until_complete(self._start_scheduler())
-                 self.logger.debug("Scheduler started in event loop")
+                current_loop.run_until_complete(self._start_scheduler())
+                self.logger.debug("Scheduler started in event loop")
 
             self.logger.info("=== STARTING BOT POLLING ===")
             self.application.run_polling()
@@ -170,6 +167,9 @@ class TelegramBot:
             await self.application.stop()
             self.logger.info("TelegramBot.stop() finished (delegated to PTB shutdown).")
         else:
-            self.logger.info("TelegramBot.stop() called, but application not initialized.")
+            self.logger.info(
+                "TelegramBot.stop() called, but application not initialized."
+            )
+
 
 telegram_bot = TelegramBot()
