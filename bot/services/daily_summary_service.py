@@ -6,6 +6,7 @@ from bot.services.openai_service import openai_service
 from bot.utils.format_utils import format_recent_messages
 from bot.utils.logger import logger
 from bot.services.message_service import message_service
+from bot.utils.constants import MAX_RECENT_MESSAGES
 
 logger = logger.get_logger(__name__)
 
@@ -107,18 +108,22 @@ async def send_daily_summary_for(chat_id: int):
     logger.debug(f"=== DAILY SUMMARY FOR CHAT {chat_id} STARTED ===")
 
     try:
-        logger.info(f"Generating daily summary for chat {chat_id}")
-
-        # Get chat configuration
+        logger.info(
+            f"Generating daily summary for chat {chat_id}"
+        )  # Get chat configuration
         logger.debug("Retrieving chat summary configuration...")
         config = await db_service.get_chat_summary_config(chat_id)
-        logger.debug(f"Chat config: {config}")  # Get recent messages (last 24 hours)
-        logger.debug("Retrieving recent messages (24 hours)...")
-        messages = await db_service.get_recent_messages_by_time(chat_id, hours=24)
+        logger.debug(f"Chat config: {config}")
+
+        # Get recent messages (up to MAX_RECENT_MESSAGES)
+        logger.debug(f"Retrieving recent messages (up to {MAX_RECENT_MESSAGES})...")
+        messages = await db_service.get_recent_messages(
+            chat_id, limit=MAX_RECENT_MESSAGES
+        )
         messages_count = len(messages)
 
         logger.info(
-            f"Found {messages_count} messages in the last 24 hours for chat {chat_id}."
+            f"Found {messages_count} total messages for chat {chat_id} daily summary."
         )
 
         # Check if there are enough messages to summarize
@@ -152,9 +157,9 @@ async def send_daily_summary_for(chat_id: int):
 
         final_summary = f"📅 **Resumen del día {yesterday}**\n\n{summary}"
         final_length = len(final_summary)
-        logger.debug(f"Final summary length: {final_length} chars")
-
-        # Send the summary to the chat
+        logger.debug(
+            f"Final summary length: {final_length} chars"
+        )  # Send the summary to the chat
         logger.debug("Sending summary to chat...")
         success = await message_service.send_message(
             chat_id=chat_id, text=final_summary, parse_mode="Markdown"
@@ -164,19 +169,11 @@ async def send_daily_summary_for(chat_id: int):
             logger.info(
                 f"=== DAILY SUMMARY COMPLETED SUCCESSFULLY FOR CHAT {chat_id} ==="
             )
+            # Cleanup old messages after successful summary
+            logger.info(f"Triggering post-summary message cleanup for chat {chat_id}")
+            await db_service.cleanup_chat_messages(chat_id)
         else:
-            logger.warning(
-                f"Failed to send daily summary to chat {chat_id}, removing scheduled job"
-            )
-            try:
-                from bot.services.scheduler_service import scheduler_service
-
-                scheduler_service.remove_daily_summary_job(chat_id)
-                logger.debug(f"Removed scheduled job for failed chat {chat_id}")
-            except Exception as cleanup_error:
-                logger.error(
-                    f"Error removing job for failed chat {chat_id}: {cleanup_error}"
-                )
+            logger.warning(f"Failed to send daily summary to chat {chat_id}")
 
     except Exception as e:
         logger.error(f"=== DAILY SUMMARY FAILED FOR CHAT {chat_id} ===")

@@ -122,23 +122,6 @@ class DatabaseService:
                 END;
                 """
             )
-            # Crear trigger para limpiar mensajes antiguos después de insertar uno nuevo
-            await self.conn.execute(
-                f"""
-                CREATE TRIGGER IF NOT EXISTS cleanup_old_messages
-                AFTER INSERT ON telegram_message
-                BEGIN
-                    DELETE FROM telegram_message
-                    WHERE chat_id = NEW.chat_id
-                    AND id NOT IN (
-                        SELECT id FROM telegram_message
-                        WHERE chat_id = NEW.chat_id
-                        ORDER BY telegram_message_id DESC
-                        LIMIT {MAX_RECENT_MESSAGES}
-                    );
-                END;
-                """
-            )
 
             # Add columns if they don't exist
             try:
@@ -152,7 +135,7 @@ class DatabaseService:
                 if "duplicate column" not in str(e).lower():
                     # Log or ignore if the table might not exist yet,
                     # but for now, we'll re-raise if it's not a duplicate column error
-                    pass # Or self.logger.warning("Could not add daily_summary_enabled, table might not exist or other issue.")
+                    pass  # Or self.logger.warning("Could not add daily_summary_enabled, table might not exist or other issue.")
 
             try:
                 await self.conn.execute(
@@ -164,7 +147,7 @@ class DatabaseService:
             except aiosqlite.OperationalError as e:
                 if "duplicate column" not in str(e).lower():
                     # Similar handling as above
-                    pass # Or self.logger.warning("Could not add summary_type, table might not exist or other issue.")
+                    pass  # Or self.logger.warning("Could not add summary_type, table might not exist or other issue.")
 
             # Add new columns to telegram_user if they don't exist
             user_columns_to_add = {
@@ -182,7 +165,9 @@ class DatabaseService:
                     self.logger.info(f"Added column {col_name} to telegram_user table.")
                 except aiosqlite.OperationalError as e:
                     if "duplicate column" not in str(e).lower():
-                        self.logger.warning(f"Could not add column {col_name} to telegram_user: {e}")
+                        self.logger.warning(
+                            f"Could not add column {col_name} to telegram_user: {e}"
+                        )
                     else:  # Column already exists
                         pass
 
@@ -227,16 +212,18 @@ class DatabaseService:
                 rows = await existing_configs.fetchall()
 
                 if rows:
-                    self.logger.info(f"Migrating {len(rows)} existing chat configurations...")
+                    self.logger.info(
+                        f"Migrating {len(rows)} existing chat configurations..."
+                    )
 
                     for row in rows:
                         chat_id = row[0]
-                        summary_type = row[1] if row[1] else 'medium'
+                        summary_type = row[1] if row[1] else "medium"
                         daily_summary_enabled = row[2] if row[2] else False
 
                         # Map old summary_type to new length
-                        length = 'short' if summary_type == 'short' else 'long'
-                        daily_hour = '03' if daily_summary_enabled else 'off'
+                        length = "short" if summary_type == "short" else "long"
+                        daily_hour = "03" if daily_summary_enabled else "off"
 
                         # Insert into new table (ignore if already exists)
                         await self.conn.execute(
@@ -245,12 +232,14 @@ class DatabaseService:
                                 chat_id, tone, length, language, include_names, daily_summary_hour
                             ) VALUES (?, 'neutral', ?, 'es', 1, ?)
                             """,
-                            (chat_id, length, daily_hour)
+                            (chat_id, length, daily_hour),
                         )
 
                     self.logger.info("Migration completed successfully")
             except Exception as e:
-                self.logger.warning(f"Migration from old schema failed (this is normal for new installations): {e}")
+                self.logger.warning(
+                    f"Migration from old schema failed (this is normal for new installations): {e}"
+                )
 
             await self.conn.commit()
             self.logger.info("=== DATABASE INITIALIZATION COMPLETED SUCCESSFULLY ===")
@@ -281,9 +270,13 @@ class DatabaseService:
 
                 if auto_commit:
                     await self.conn.commit()
-                    self.logger.debug(f"Query executed and committed. Rows affected: {rows_affected}")
+                    self.logger.debug(
+                        f"Query executed and committed. Rows affected: {rows_affected}"
+                    )
                 else:
-                    self.logger.debug(f"Query executed without commit. Rows affected: {rows_affected}")
+                    self.logger.debug(
+                        f"Query executed without commit. Rows affected: {rows_affected}"
+                    )
 
         except Exception as e:
             self.logger.error(f"Database query failed - Type: {query_type}")
@@ -308,7 +301,9 @@ class DatabaseService:
             async with self.conn.execute(query, params) as cursor:
                 result = await cursor.fetchone()
                 result_dict = dict(result) if result else None
-                self.logger.debug(f"Result: {'Found 1 row' if result_dict else 'No rows found'}")
+                self.logger.debug(
+                    f"Result: {'Found 1 row' if result_dict else 'No rows found'}"
+                )
                 return result_dict
         except Exception as e:
             self.logger.error(f"Database fetch_one failed")
@@ -346,7 +341,9 @@ class DatabaseService:
             self.logger.info("Database connection closed")
             self.conn = None
 
-    async def get_recent_messages(self, chat_id: int, limit: int = 300, hours: int = None) -> List[Dict]:
+    async def get_recent_messages(
+        self, chat_id: int, limit: int = 300, hours: int = None
+    ) -> List[Dict]:
         """Get recent messages from a chat.
 
         Args:
@@ -374,7 +371,9 @@ class DatabaseService:
                     ORDER BY m.telegram_message_id ASC
                     LIMIT ?
                 """
-                messages = await self.fetch_all(query, (chat_id, start_time_utc.isoformat(), limit))
+                messages = await self.fetch_all(
+                    query, (chat_id, start_time_utc.isoformat(), limit)
+                )
             else:
                 # Get the most recent messages up to the limit
                 query = """
@@ -413,7 +412,9 @@ class DatabaseService:
             self.logger.debug(f"Input date: {date}")
             self.logger.debug(f"Madrid day_start: {day_start}")
             self.logger.debug(f"Madrid day_end: {day_end}")
-            self.logger.debug(f"UTC day_start: {day_start_utc} ({day_start_utc.isoformat()})")
+            self.logger.debug(
+                f"UTC day_start: {day_start_utc} ({day_start_utc.isoformat()})"
+            )
             self.logger.debug(f"UTC day_end: {day_end_utc} ({day_end_utc.isoformat()})")
 
             query = """
@@ -427,7 +428,9 @@ class DatabaseService:
                 ORDER BY m.telegram_message_id ASC
             """
 
-            self.logger.debug(f"Query params: chat_id={chat_id}, start={day_start_utc.isoformat()}, end={day_end_utc.isoformat()}")
+            self.logger.debug(
+                f"Query params: chat_id={chat_id}, start={day_start_utc.isoformat()}, end={day_end_utc.isoformat()}"
+            )
 
             messages = await self.fetch_all(
                 query,
@@ -592,7 +595,9 @@ class DatabaseService:
         """
         try:
             await self.execute(query, tuple(params))
-            self.logger.info(f"User {user_id} updated with fields: {', '.join(fields_to_update.keys())}")
+            self.logger.info(
+                f"User {user_id} updated with fields: {', '.join(fields_to_update.keys())}"
+            )
         except Exception as e:
             self.logger.error(f"Error updating user {user_id}: {e}", exc_info=True)
             raise
@@ -686,11 +691,11 @@ class DatabaseService:
             if not config:
                 # Create default configuration
                 default_config = {
-                    'tone': 'neutral',
-                    'length': 'medium',
-                    'language': 'es',
-                    'include_names': True,
-                    'daily_summary_hour': 'off'
+                    "tone": "neutral",
+                    "length": "medium",
+                    "language": "es",
+                    "include_names": True,
+                    "daily_summary_hour": "off",
                 }
 
                 await self.execute(
@@ -701,17 +706,17 @@ class DatabaseService:
                     """,
                     (
                         chat_id,
-                        default_config['tone'],
-                        default_config['length'],
-                        default_config['language'],
-                        default_config['include_names'],
-                        default_config['daily_summary_hour']
-                    )
+                        default_config["tone"],
+                        default_config["length"],
+                        default_config["language"],
+                        default_config["include_names"],
+                        default_config["daily_summary_hour"],
+                    ),
                 )
 
                 # Return the default configuration with chat_id
                 config = default_config.copy()
-                config['chat_id'] = chat_id
+                config["chat_id"] = chat_id
                 self.logger.info(f"Created default summary config for chat {chat_id}")
 
             return dict(config)
@@ -747,7 +752,9 @@ class DatabaseService:
             """
 
             await self.execute(query, tuple(params))
-            self.logger.info(f"Updated summary config for chat {chat_id}: {', '.join(changes.keys())}")
+            self.logger.info(
+                f"Updated summary config for chat {chat_id}: {', '.join(changes.keys())}"
+            )
             return True
         except Exception as e:
             self.logger.error(f"Error updating chat summary config for {chat_id}: {e}")
@@ -772,7 +779,9 @@ class DatabaseService:
             self.logger.error(f"Error getting all daily summary configs: {e}")
             return []
 
-    async def get_recent_messages_by_time(self, chat_id: int, hours: int = 24) -> List[Dict]:
+    async def get_recent_messages_by_time(
+        self, chat_id: int, hours: int = 24
+    ) -> List[Dict]:
         """Get recent messages from a chat within a specific time window.
 
         Args:
@@ -798,20 +807,47 @@ class DatabaseService:
             query = """
                 SELECT m.message_text, m.telegram_message_id, m.telegram_reply_to_message_id,
                        u.user_id, u.first_name, u.last_name, u.username, m.created_at
-                FROM telegram_message m
-                JOIN telegram_user u ON m.user_id = u.user_id
+                FROM telegram_message m                JOIN telegram_user u ON m.user_id = u.user_id
                 WHERE m.chat_id = ?
                 AND m.created_at BETWEEN ? AND ?
                 ORDER BY m.telegram_message_id ASC
             """
             messages = await self.fetch_all(
-                query,
-                (chat_id, start_time_utc.isoformat(), now_utc.isoformat())
+                query, (chat_id, start_time_utc.isoformat(), now_utc.isoformat())
             )
-            self.logger.info(f"Retrieved {len(messages)} messages from last {hours} hours for chat {chat_id}")
+            self.logger.info(
+                f"Retrieved {len(messages)} messages from last {hours} hours for chat {chat_id}"
+            )
             return messages
         except Exception as e:
             self.logger.error(f"Error getting recent messages by time: {e}")
             return []
+
+    async def cleanup_chat_messages(self, chat_id: int):
+        """
+        Deletes old messages from a chat, keeping only the most recent ones
+        defined by MAX_RECENT_MESSAGES.
+        """
+        try:
+            self.logger.info(
+                f"Running scheduled cleanup for chat {chat_id}. Keeping last {MAX_RECENT_MESSAGES} messages."
+            )
+            query = f"""
+                DELETE FROM telegram_message
+                WHERE chat_id = ? AND id NOT IN (
+                    SELECT id FROM telegram_message
+                    WHERE chat_id = ?
+                    ORDER BY telegram_message_id DESC
+                    LIMIT ?
+                )
+            """
+            await self.execute(query, (chat_id, chat_id, MAX_RECENT_MESSAGES))
+            self.logger.info(f"Cleanup for chat {chat_id} completed successfully.")
+        except Exception as e:
+            self.logger.error(
+                f"Error during scheduled cleanup for chat {chat_id}: {e}", exc_info=True
+            )
+            raise
+
 
 db_service = DatabaseService()  # Single instance
