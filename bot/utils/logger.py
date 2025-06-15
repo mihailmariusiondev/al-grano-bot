@@ -21,7 +21,7 @@ class Logger:
             cls._instance.log_level = logging.INFO
             cls._instance.log_dir = Path("logs")
             # Un formato un poco más limpio para la consola y los archivos
-            cls._instance.log_format = "%(asctime)s - %(name)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(funcName)s() - %(message)s"
+            cls._instance.log_format = "%(asctime)s - %(name)s - %(levelname)s - [%(name)s:%(lineno)d] - %(funcName)s() - %(message)s"
             # Ya no necesitamos max_file_size, pero sí backup_count
             cls._instance.backup_count = 7  # 7 días de historial
             cls._instance._init_logger()
@@ -94,7 +94,6 @@ class Logger:
             self._loggers[name] = logging.getLogger(name)
         return self._loggers[name]
 
-    # Los métodos de ayuda se mantienen igual
     def log_function_entry(self, logger_instance, func_name: str, **kwargs):
         if self.log_level > logging.DEBUG:
             return

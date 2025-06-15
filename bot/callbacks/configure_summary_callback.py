@@ -7,7 +7,9 @@ from bot.utils.logger import logger
 logger = logger.get_logger(__name__)
 
 
-async def configure_summary_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def configure_summary_callback(
+    update: Update, context: ContextTypes.DEFAULT_TYPE
+) -> None:
     """Handle callback queries from the configuration menu."""
     try:
         query = update.callback_query
@@ -15,8 +17,8 @@ async def configure_summary_callback(update: Update, context: ContextTypes.DEFAU
         user_id = update.effective_user.id
 
         # Parse callback data
-        parts = query.data.split('|')
-        if len(parts) < 3 or parts[0] != 'cfg':
+        parts = query.data.split("|")
+        if len(parts) < 3 or parts[0] != "cfg":
             await query.answer("❌ Opción inválida")
             return
 
@@ -26,11 +28,14 @@ async def configure_summary_callback(update: Update, context: ContextTypes.DEFAU
         # --- FIX START ---
         # Check permissions in group chats
         is_bot_admin = await db_service.is_user_admin(user_id)
-        if not is_bot_admin and update.effective_chat.type in ['group', 'supergroup']:
+        if not is_bot_admin and update.effective_chat.type in ["group", "supergroup"]:
             try:
                 member = await context.bot.get_chat_member(chat_id, user_id)
-                if member.status not in ['creator', 'administrator']:
-                    await query.answer("❌ Solo los administradores pueden cambiar la configuración", show_alert=True)
+                if member.status not in ["creator", "administrator"]:
+                    await query.answer(
+                        "❌ Solo los administradores pueden cambiar la configuración",
+                        show_alert=True,
+                    )
                     return
             except Exception as e:
                 logger.warning(f"Failed to check user permissions: {e}")
@@ -40,80 +45,114 @@ async def configure_summary_callback(update: Update, context: ContextTypes.DEFAU
 
         # Get current config and language
         config = await db_service.get_chat_summary_config(chat_id)
-        language = config.get('language', 'es')
+        language = config.get("language", "es")
 
         # Handle "open" action - show submenu
-        if action == 'open':
+        if action == "open":
             await show_submenu(query, field, language, config, context)
             return
 
         # Handle "back to main menu" action
-        if action == 'back_main':
+        if action == "back_main":
             await show_main_menu(query, context)
             return
 
         # Handle value selection
         try:
             # Update the database with new value
-            if field == 'include_names':
+            if field == "include_names":
                 # Convert string 'true'/'false' to boolean
-                value = action.lower() == 'true'
+                value = action.lower() == "true"
             else:
                 value = action
 
-            success = await db_service.update_chat_summary_config(chat_id, {field: value})
+            success = await db_service.update_chat_summary_config(
+                chat_id, {field: value}
+            )
 
             if success:
                 # Show confirmation message
-                if field == 'daily_summary_hour':
-                    if value == 'off':
-                        confirm_text = get_label('confirm_daily_off', language)
+                if field == "daily_summary_hour":
+                    if value == "off":
+                        confirm_text = get_label("confirm_daily_off", language)
                     else:
-                        confirm_text = f"{get_label('confirm_daily_hour', language)} {value}"
+                        confirm_text = (
+                            f"{get_label('confirm_daily_hour', language)} {value}"
+                        )
                 else:
                     confirm_text = f"{get_label(f'confirm_{field}', language)} {get_button_label(field, str(value).lower(), language)}"
 
-                await query.answer(confirm_text)
-
-                # If daily_summary_hour changed, update scheduler
-                if field == 'daily_summary_hour':
-                    logger.debug(f"Daily summary hour changed to {value} for chat {chat_id}")
+                await query.answer(
+                    confirm_text
+                )  # If daily_summary_hour changed, update scheduler
+                if field == "daily_summary_hour":
+                    logger.debug(
+                        f"Daily summary hour changed to {value} for chat {chat_id}"
+                    )
                     try:
                         from bot.services.scheduler_service import scheduler_service
 
                         # Check if scheduler is running before attempting update
                         if not scheduler_service.scheduler.running:
-                            logger.error(f"Scheduler is not running, cannot update job for chat {chat_id}")
-                            await query.answer("⚠️ Configuración guardada, pero el programador no está activo. Contacta al administrador.", show_alert=True)
+                            logger.error(
+                                f"Scheduler is not running, cannot update job for chat {chat_id}"
+                            )
+                            await query.answer(
+                                "⚠️ Configuración guardada, pero el programador no está activo. Contacta al administrador.",
+                                show_alert=True,
+                            )
                             return
 
                         scheduler_service.update_daily_summary_job(chat_id, value)
-                        logger.info(f"✅ Successfully updated daily summary schedule for chat {chat_id} to {value}")
+                        logger.info(
+                            f"✅ Successfully updated daily summary schedule for chat {chat_id} to {value}"
+                        )
 
-                        # Verify the job was created/updated
-                        if value != 'off':
+                        # Verify the job was created/updated and add next run time to confirmation
+                        confirm_text_details = ""
+                        if value != "off":
                             job_id = f"daily_summary_{chat_id}"
                             job = scheduler_service.scheduler.get_job(job_id)
                             if job:
-                                logger.debug(f"Scheduler job verification successful: {job.next_run_time}")
+                                logger.debug(
+                                    f"Scheduler job verification successful: {job.next_run_time}"
+                                )
+                                import pytz
+
+                                next_run_madrid = job.next_run_time.astimezone(
+                                    pytz.timezone("Europe/Madrid")
+                                )
+                                confirm_text_details = f"\n*Próximo resumen:* {next_run_madrid.strftime('%d/%m a las %H:%M')}"
                             else:
-                                logger.error(f"Scheduler job verification failed for chat {chat_id}")
-                                await query.answer("⚠️ Configuración guardada, pero hubo un problema con el programador. Contacta al administrador.", show_alert=True)
-                                return
+                                logger.error(
+                                    f"Scheduler job verification failed for chat {chat_id}"
+                                )  # Update the confirmation message with next run details
+                        if confirm_text_details:
+                            await query.answer(confirm_text + confirm_text_details)
+                        else:
+                            await query.answer(confirm_text)
 
                     except Exception as e:
-                        logger.error(f"❌ Failed to update scheduler for chat {chat_id}: {e}", exc_info=True)
-                        await query.answer("⚠️ Configuración guardada, pero hubo un problema con el programador. Contacta al administrador.", show_alert=True)
+                        logger.error(
+                            f"❌ Failed to update scheduler for chat {chat_id}: {e}",
+                            exc_info=True,
+                        )
+                        await query.answer(
+                            "⚠️ Configuración guardada, pero hubo un problema con el programador. Contacta al administrador.",
+                            show_alert=True,
+                        )
                         return
 
                 # Return to main menu
                 await show_main_menu(query, context)
             else:
-                await query.answer(get_label('error_db', language), show_alert=True)
+                await query.answer(get_label("error_db", language), show_alert=True)
 
         except Exception as e:
-            logger.error(f"Error updating config for chat {chat_id}: {e}", exc_info=True)
-            await query.answer(get_label('error_db', language), show_alert=True)
+            logger.error(
+                f"Error updating config for chat {chat_id}: {e}", exc_info=True
+            )
+            await query.answer(get_label("error_db", language), show_alert=True)
 
     except Exception as e:
         logger.error(f"Error in configure_summary_callback: {e}", exc_info=True)
@@ -127,28 +166,32 @@ async def show_submenu(query, field, language, config, context):
         message_id = query.message.message_id
 
         # Create submenu title
-        title = get_label(f'{field}_submenu_title', language)
+        title = get_label(f"{field}_submenu_title", language)
 
         # Create buttons based on field type
         keyboard = []
 
         # Get options for this field from LABELS
-        if field in LABELS[language]['buttons']:
-            options = LABELS[language]['buttons'][field]
+        if field in LABELS[language]["buttons"]:
+            options = LABELS[language]["buttons"][field]
 
             # Arrange buttons in rows (2-3 buttons per row depending on field)
             row = []
-            max_per_row = 2 if field == 'daily_summary_hour' else 3
+            max_per_row = 2 if field == "daily_summary_hour" else 3
 
             for key, label in options.items():
                 # Highlight current value
-                if field == 'include_names':
+                if field == "include_names":
                     is_current = str(config[field]).lower() == key.lower()
                 else:
                     is_current = config[field] == key
 
                 button_text = f"✅ {label}" if is_current else label
-                row.append(InlineKeyboardButton(button_text, callback_data=f"cfg|{field}|{key}"))
+                row.append(
+                    InlineKeyboardButton(
+                        button_text, callback_data=f"cfg|{field}|{key}"
+                    )
+                )
 
                 if len(row) == max_per_row:
                     keyboard.append(row)
@@ -158,7 +201,14 @@ async def show_submenu(query, field, language, config, context):
                 keyboard.append(row)
 
         # Add back button
-        keyboard.append([InlineKeyboardButton(get_label('back_button', language), callback_data="cfg|field|back_main")])
+        keyboard.append(
+            [
+                InlineKeyboardButton(
+                    get_label("back_button", language),
+                    callback_data="cfg|field|back_main",
+                )
+            ]
+        )
 
         reply_markup = InlineKeyboardMarkup(keyboard)
 
@@ -167,7 +217,7 @@ async def show_submenu(query, field, language, config, context):
             chat_id=chat_id,
             message_id=message_id,
             text=title,
-            reply_markup=reply_markup
+            reply_markup=reply_markup,
         )
         await query.answer()
 
@@ -184,10 +234,10 @@ async def show_main_menu(query, context):
 
         # Get current config from database
         config = await db_service.get_chat_summary_config(chat_id)
-        language = config.get('language', 'es')
+        language = config.get("language", "es")
 
         # Create main menu message
-        message_text = get_label('title_main', language) + "\n\n"
+        message_text = get_label("title_main", language) + "\n\n"
 
         # Add current settings
         message_text += f"🧠 {get_label('tone_label', language)}: {get_button_label('tone', config['tone'], language)}\n"
@@ -199,14 +249,28 @@ async def show_main_menu(query, context):
         # Create inline keyboard
         keyboard = [
             [
-                InlineKeyboardButton(get_label('tone_button', language), callback_data="cfg|tone|open"),
-                InlineKeyboardButton(get_label('length_button', language), callback_data="cfg|length|open"),
-                InlineKeyboardButton(get_label('language_button', language), callback_data="cfg|language|open")
+                InlineKeyboardButton(
+                    get_label("tone_button", language), callback_data="cfg|tone|open"
+                ),
+                InlineKeyboardButton(
+                    get_label("length_button", language),
+                    callback_data="cfg|length|open",
+                ),
+                InlineKeyboardButton(
+                    get_label("language_button", language),
+                    callback_data="cfg|language|open",
+                ),
             ],
             [
-                InlineKeyboardButton(get_label('names_button', language), callback_data="cfg|include_names|open"),
-                InlineKeyboardButton(get_label('hour_button', language), callback_data="cfg|daily_summary_hour|open")
-            ]
+                InlineKeyboardButton(
+                    get_label("names_button", language),
+                    callback_data="cfg|include_names|open",
+                ),
+                InlineKeyboardButton(
+                    get_label("hour_button", language),
+                    callback_data="cfg|daily_summary_hour|open",
+                ),
+            ],
         ]
 
         reply_markup = InlineKeyboardMarkup(keyboard)
@@ -216,7 +280,7 @@ async def show_main_menu(query, context):
             chat_id=chat_id,
             message_id=message_id,
             text=message_text,
-            reply_markup=reply_markup
+            reply_markup=reply_markup,
         )
         await query.answer()
 

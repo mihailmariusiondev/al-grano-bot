@@ -76,7 +76,9 @@ async def generate_daily_summary(chat_id: int) -> str:
 
         # Generate summary
         summary = await openai_service.get_summary(
-            content=formatted_messages, summary_type=summary_type, summary_config={"language": "Spanish"}
+            content=formatted_messages,
+            summary_type=summary_type,
+            summary_config={"language": "Spanish"},
         )
 
         # Add header to summary
@@ -101,6 +103,7 @@ async def send_daily_summary_for(chat_id: int):
     Args:
         chat_id: The chat ID to summarize
     """
+    logger.info(f"=== TRIGGERED DAILY SUMMARY FOR CHAT {chat_id} ===")
     logger.debug(f"=== DAILY SUMMARY FOR CHAT {chat_id} STARTED ===")
 
     try:
@@ -120,7 +123,9 @@ async def send_daily_summary_for(chat_id: int):
 
         # Check if there are enough messages to summarize
         if messages_count < 5:
-            logger.info(f"Not enough messages ({messages_count}) for chat {chat_id}, skipping summary")
+            logger.info(
+                f"Not enough messages ({messages_count}) for chat {chat_id}, skipping summary"
+            )
             return
 
         # Format messages for the AI
@@ -133,8 +138,8 @@ async def send_daily_summary_for(chat_id: int):
         logger.debug("Calling OpenAI service for summary generation...")
         summary = await openai_service.get_summary(
             content=formatted_content,
-            summary_type="chat", # El tipo genérico de chat
-            summary_config=config # Le pasamos toda la configuración
+            summary_type="chat",  # El tipo genérico de chat
+            summary_config=config,  # Le pasamos toda la configuración
         )
 
         summary_length = len(summary)
@@ -152,25 +157,32 @@ async def send_daily_summary_for(chat_id: int):
         # Send the summary to the chat
         logger.debug("Sending summary to chat...")
         success = await message_service.send_message(
-            chat_id=chat_id,
-            text=final_summary,
-            parse_mode="Markdown"
+            chat_id=chat_id, text=final_summary, parse_mode="Markdown"
         )
 
         if success:
-            logger.info(f"=== DAILY SUMMARY COMPLETED SUCCESSFULLY FOR CHAT {chat_id} ===")
+            logger.info(
+                f"=== DAILY SUMMARY COMPLETED SUCCESSFULLY FOR CHAT {chat_id} ==="
+            )
         else:
-            logger.warning(f"Failed to send daily summary to chat {chat_id}, removing scheduled job")
+            logger.warning(
+                f"Failed to send daily summary to chat {chat_id}, removing scheduled job"
+            )
             try:
                 from bot.services.scheduler_service import scheduler_service
+
                 scheduler_service.remove_daily_summary_job(chat_id)
                 logger.debug(f"Removed scheduled job for failed chat {chat_id}")
             except Exception as cleanup_error:
-                logger.error(f"Error removing job for failed chat {chat_id}: {cleanup_error}")
+                logger.error(
+                    f"Error removing job for failed chat {chat_id}: {cleanup_error}"
+                )
 
     except Exception as e:
         logger.error(f"=== DAILY SUMMARY FAILED FOR CHAT {chat_id} ===")
-        logger.error(f"Error sending daily summary for chat {chat_id}: {e}", exc_info=True)
+        logger.error(
+            f"Error sending daily summary for chat {chat_id}: {e}", exc_info=True
+        )
 
 
 async def send_daily_summaries():

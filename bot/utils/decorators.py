@@ -46,9 +46,12 @@ def admin_command(func=None):
     """
     Decorator to restrict command access to admin users only
     """
+
     def decorator(f):
         @wraps(f)
-        async def wrapped(update: Update, context: ContextTypes.DEFAULT_TYPE, *args, **kwargs):
+        async def wrapped(
+            update: Update, context: ContextTypes.DEFAULT_TYPE, *args, **kwargs
+        ):
             user_id = update.effective_user.id
             # Fetch admin users from the database
             admin_users = await db_service.get_admin_users()
@@ -58,6 +61,7 @@ def admin_command(func=None):
                 )
                 return
             return await f(update, context, *args, **kwargs)
+
         return wrapped
 
     if func is None:
@@ -115,6 +119,7 @@ def log_command():
         @wraps(func)
         async def wrapped(update: Update, context: ContextTypes.DEFAULT_TYPE):
             user = update.effective_user
+            chat = update.effective_chat
             command = update.message.text
 
             # Build user info string with available fields
@@ -128,7 +133,13 @@ def log_command():
             # Filter out None values and join
             user_details = " | ".join([info for info in user_info if info])
 
-            logger.info(f"Command executed by [{user_details}]: {command}")
+            # Add chat context
+            chat_id = chat.id if chat else "Unknown"
+            message_id = update.message.message_id if update.message else "Unknown"
+
+            logger.info(
+                f"[user:{user.id}|chat:{chat_id}|msg:{message_id}] Command: {command} | User: [{user_details}]"
+            )
 
             return await func(update, context)
 

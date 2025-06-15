@@ -6,6 +6,7 @@ from bot.utils.logger import logger
 
 logger = logger.get_logger(__name__)
 
+
 class SchedulerService:
     _instance = None
 
@@ -34,14 +35,18 @@ class SchedulerService:
 
                 # THEN load all configured daily summary jobs
                 logger.debug("Loading daily summary jobs from database...")
-                await self._load_daily_summary_jobs()
-
-                # Log current jobs
+                await self._load_daily_summary_jobs()  # Log current jobs
                 jobs = self.get_scheduled_jobs()
-                logger.info(f"=== SCHEDULER STARTED SUCCESSFULLY ===")
-                logger.info(f"Active jobs: {len(jobs)}")
-                for job in jobs:
-                    logger.debug(f"Job: {job['id']} - {job['name']} - Next run: {job['next_run']}")
+                logger.info(f"=== SCHEDULER STARTED - {len(jobs)} JOBS LOADED ===")
+                if not jobs:
+                    logger.warning(
+                        "Scheduler warning: No scheduled jobs found after loading."
+                    )
+                else:
+                    for job in jobs:
+                        logger.info(
+                            f"-> Job Loaded: ID={job['id']}, Name='{job['name']}', Next Run (UTC): {job['next_run']}"
+                        )
             else:
                 logger.warning("Scheduler was already running")
 
@@ -67,12 +72,12 @@ class SchedulerService:
 
             # Create a job for each chat
             for config in configs:
-                chat_id = config['chat_id']
-                hour = config['daily_summary_hour']
+                chat_id = config["chat_id"]
+                hour = config["daily_summary_hour"]
 
                 logger.debug(f"Processing config - Chat: {chat_id}, Hour: {hour}")
 
-                if hour != 'off':
+                if hour != "off":
                     self.add_daily_summary_job(chat_id, hour)
                     jobs_created += 1
                 else:
@@ -102,14 +107,14 @@ class SchedulerService:
 
             # Check if scheduler is running
             if not self.scheduler.running:
-                logger.warning(f"Scheduler not running, cannot add job for chat {chat_id}")
+                logger.warning(
+                    f"Scheduler not running, cannot add job for chat {chat_id}"
+                )
                 raise RuntimeError("Scheduler is not running")
 
             # Create a cron trigger for the specified hour (Madrid timezone)
             trigger = CronTrigger(
-                hour=int(hour),
-                minute=0,
-                timezone=pytz.timezone("Europe/Madrid")
+                hour=int(hour), minute=0, timezone=pytz.timezone("Europe/Madrid")
             )
             logger.debug(f"Created cron trigger for {hour}:00 Madrid time")
 
@@ -129,10 +134,12 @@ class SchedulerService:
                 id=job_id,
                 name=f"Daily summary for chat {chat_id}",
                 replace_existing=True,
-                args=[chat_id]
+                args=[chat_id],
             )
 
-            logger.info(f"✅ Successfully added daily summary job for chat {chat_id} at {hour}:00")
+            logger.info(
+                f"✅ Successfully added daily summary job for chat {chat_id} at {hour}:00"
+            )
             logger.debug(f"Job next run time: {job.next_run_time}")
 
             # Verify job was added
@@ -140,10 +147,15 @@ class SchedulerService:
             if verify_job:
                 logger.debug(f"Job verification successful: {verify_job.id}")
             else:
-                logger.error(f"Job verification failed: job {job_id} not found after adding")
+                logger.error(
+                    f"Job verification failed: job {job_id} not found after adding"
+                )
 
         except Exception as e:
-            logger.error(f"❌ Error adding daily summary job for chat {chat_id}: {e}", exc_info=True)
+            logger.error(
+                f"❌ Error adding daily summary job for chat {chat_id}: {e}",
+                exc_info=True,
+            )
             raise
 
     def remove_daily_summary_job(self, chat_id: int):
@@ -163,7 +175,10 @@ class SchedulerService:
                 logger.debug(f"No daily summary job found for chat {chat_id}")
 
         except Exception as e:
-            logger.error(f"Error removing daily summary job for chat {chat_id}: {e}", exc_info=True)
+            logger.error(
+                f"Error removing daily summary job for chat {chat_id}: {e}",
+                exc_info=True,
+            )
 
     def update_daily_summary_job(self, chat_id: int, hour: str):
         """Update the daily summary job for a chat based on configuration.
@@ -173,13 +188,16 @@ class SchedulerService:
             hour: The new hour setting ('00', '03', '08', '12', '18', '21', 'off')
         """
         try:
-            if hour == 'off':
+            if hour == "off":
                 self.remove_daily_summary_job(chat_id)
             else:
                 self.add_daily_summary_job(chat_id, hour)
 
         except Exception as e:
-            logger.error(f"Error updating daily summary job for chat {chat_id}: {e}", exc_info=True)
+            logger.error(
+                f"Error updating daily summary job for chat {chat_id}: {e}",
+                exc_info=True,
+            )
 
     def stop(self):
         """Stop the scheduler"""
@@ -198,14 +216,19 @@ class SchedulerService:
             jobs = []
             for job in self.scheduler.get_jobs():
                 job_info = {
-                    'id': job.id,
-                    'name': job.name,
-                    'next_run': job.next_run_time if self.scheduler.running else 'Not scheduled (scheduler not running)'
+                    "id": job.id,
+                    "name": job.name,
+                    "next_run": (
+                        job.next_run_time
+                        if self.scheduler.running
+                        else "Not scheduled (scheduler not running)"
+                    ),
                 }
                 jobs.append(job_info)
             return jobs
         except Exception as e:
             logger.error(f"Error getting scheduled jobs: {e}", exc_info=True)
             return []
+
 
 scheduler_service = SchedulerService()  # Single instance
