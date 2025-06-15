@@ -183,34 +183,64 @@ async def show_submenu(query, field, language, config, context):
         # Create buttons based on field type
         keyboard = []
 
-        # Get options for this field from LABELS
-        if field in LABELS[language]["buttons"]:
-            options = LABELS[language]["buttons"][field]
+        if field == "daily_summary_hour":
+            # Generate dynamic buttons for all 24 hours
 
-            # Arrange buttons in rows (2-3 buttons per row depending on field)
+            # Button to disable
+            is_off_current = config[field] == "off"
+            off_button_text = (
+                f"✅ {get_button_label(field, 'off', language)}"
+                if is_off_current
+                else get_button_label(field, "off", language)
+            )
+            keyboard.append(
+                [
+                    InlineKeyboardButton(
+                        off_button_text, callback_data="cfg|daily_summary_hour|off"
+                    )
+                ]
+            )
+
+            # Generate buttons for each hour in a 4x6 grid
             row = []
-            max_per_row = 2 if field == "daily_summary_hour" else 3
+            for hour in range(24):
+                hour_str = f"{hour:02d}"  # Format "00", "01", etc.
+                is_current = config[field] == hour_str
+                button_text = f"✅ {hour_str}:00" if is_current else f"{hour_str}:00"
 
-            for key, label in options.items():
-                # Highlight current value
-                if field == "include_names":
-                    is_current = str(config[field]).lower() == key.lower()
-                else:
-                    is_current = config[field] == key
-
-                button_text = f"✅ {label}" if is_current else label
                 row.append(
                     InlineKeyboardButton(
-                        button_text, callback_data=f"cfg|{field}|{key}"
+                        button_text, callback_data=f"cfg|daily_summary_hour|{hour_str}"
                     )
                 )
 
-                if len(row) == max_per_row:
+                if len(row) == 4:  # 4 buttons per row
                     keyboard.append(row)
                     row = []
-
-            if row:  # Add remaining buttons
+            if row:  # Add the last row if not complete
                 keyboard.append(row)
+        else:
+            # Original logic for other fields (tone, length, etc.)
+            if field in LABELS[language]["buttons"]:
+                options = LABELS[language]["buttons"][field]
+                row = []
+                max_per_row = 3  # Keep original logic for other menus
+                for key, label in options.items():
+                    if field == "include_names":
+                        is_current = str(config[field]).lower() == key.lower()
+                    else:
+                        is_current = config[field] == key
+                    button_text = f"✅ {label}" if is_current else label
+                    row.append(
+                        InlineKeyboardButton(
+                            button_text, callback_data=f"cfg|{field}|{key}"
+                        )
+                    )
+                    if len(row) == max_per_row:
+                        keyboard.append(row)
+                        row = []
+                if row:
+                    keyboard.append(row)
 
         # Add back button
         keyboard.append(
