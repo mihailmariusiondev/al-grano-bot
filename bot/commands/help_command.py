@@ -8,7 +8,6 @@ from bot.services.database_service import db_service
 from bot.utils.constants import (
     COOLDOWN_TEXT_SIMPLE_SECONDS,
     COOLDOWN_ADVANCED_SECONDS,
-    DAILY_LIMIT_ADVANCED_OPS
 )
 import asyncio
 
@@ -50,6 +49,7 @@ HELP_MESSAGE = (
     "Este tinglado lo montó [@Arkantos2374](https://t.me/Arkantos2374), que se ha dejado las pestañas en ello. Si quieres que no me muera de hambre y que el bot siga rulando, suéltale algo por [PayPal](https://paypal.me/mariusmihailion). ¡Se agradece, fiera!\n\n"
     "🚀 **¡Venga, a darle al `/summarize` y déjate de hostias!** 🚀"
 )
+
 
 @log_command()
 @bot_started()

@@ -35,7 +35,12 @@ class SchedulerService:
 
                 # THEN load all configured daily summary jobs
                 logger.debug("Loading daily summary jobs from database...")
-                await self._load_daily_summary_jobs()  # Log current jobs
+                await self._load_daily_summary_jobs()
+
+                # Add heartbeat job
+                self._add_heartbeat_job()
+
+                # Log current jobs
                 jobs = self.get_scheduled_jobs()
                 logger.info(f"=== SCHEDULER STARTED - {len(jobs)} JOBS LOADED ===")
                 if not jobs:
@@ -229,6 +234,33 @@ class SchedulerService:
         except Exception as e:
             logger.error(f"Error getting scheduled jobs: {e}", exc_info=True)
             return []
+
+    def _add_heartbeat_job(self):
+        """Add a heartbeat job that logs every 10 minutes to verify scheduler is alive"""
+        try:
+            trigger = CronTrigger(
+                minute="*/10",  # Every 10 minutes
+                timezone=pytz.timezone("Europe/Madrid"),
+            )
+
+            self.scheduler.add_job(
+                func=self._scheduler_heartbeat,
+                trigger=trigger,
+                id="scheduler_heartbeat",
+                name="Scheduler Heartbeat",
+                replace_existing=True,
+            )
+
+            logger.info("Scheduler heartbeat job added (every 10 minutes)")
+
+        except Exception as e:
+            logger.error(f"Failed to add heartbeat job: {e}", exc_info=True)
+
+    def _scheduler_heartbeat(self):
+        """Log a heartbeat message to verify scheduler is alive"""
+        jobs_count = len(self.scheduler.get_jobs())
+        logger.info(f"💓 Scheduler heartbeat - {jobs_count} jobs active")
+        return
 
 
 scheduler_service = SchedulerService()  # Single instance
