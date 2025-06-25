@@ -343,5 +343,7 @@ Integrar un flujo de verificación para comprobar afirmaciones en los chats:
 9. **Responder en Telegram**: enviar la conclusión al usuario, opcionalmente con fuentes.
 
 Este sistema debe funcionar rápidamente y sin depender de APIs de pago.
+
+Consulta [docs/sistema_verificacion_inteligente.md](docs/sistema_verificacion_inteligente.md) para leer la propuesta completa paso a paso.
 ---
 _¡Obtén tus resúmenes al grano con la potencia de la IA! 🚀_
