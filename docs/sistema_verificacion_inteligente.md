@@ -150,6 +150,3 @@ Tu bot será capaz de:
 * Responder de forma clara, rápida y sin depender de APIs de pago
 
 ---
-
-
-
