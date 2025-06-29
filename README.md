@@ -33,6 +33,38 @@ El comando `/configurar_resumen` abre un menú interactivo multiidioma para ajus
   - **Colega 🗣️** - Como ese amigo sarcástico que te cuenta qué pasó (¡modo exclusivo!)
   - Irónico 🙃 - Señalando contradicciones con inteligencia
   - Absurdo 🤪 - Surrealista con metáforas extrañas
+  - Macarra 🥊 - Directo y callejero
+  - Cuñao de Bar 🍻 - Sabelotodo exagerado
+  - Hijoputesco 😈 - Humor negro sin piedad
+  - Misantropo Existencial 🧨 - Harto de la humanidad
+  - Cruelmente Honesto 🔪 - Brutalmente sincero
+  - Chismoso Hijoputa 🐍 - Siempre metiendo cizaña
+  - Narrador Sitcom Cutre 📺 - Estilo de comedia barata
+  - Cínico Quemado 🖕 - Desdén absoluto
+  - Cabronazo Observador 👁️ - Señalando hipocresías
+  - Cuñao Illuminati 👽 - Conspiranoico de bar
+  - Sociópata con gracia 😬 - Frialdad con humor
+  - Psicólogo Desquiciado 🧠💣 - Análisis al límite
+  - Dios da pero quita 💀 - Ironía divina
+  - Roast Máximo 🔥 - Burla a fuego
+  - El Cigala - Duende flamenco
+  - Kiko Rivera - Estilo fiestero
+  - El Dioni - Picaresca callejera
+  - El Risitas - Carcajadas contagiosas
+  - Carmen de Mairena - Exageración provocadora
+  - El Beni de Cádiz - Gaditano con arte
+  - Quico de Los Morancos - Humor sevillano
+  - Ignatius Farray - Grito caótico
+  - David Broncano - Humor seco
+  - La Veneno - Directo y descarado
+  - El Gitano Vacilón - Vacile con duende
+  - La Choni Canela Fina - Chulería colorida
+  - El Cani de Polígono - Estilo poligonero
+  - El Camello de Confianza - Vendedor persuasivo
+  - El Payo Flipao - Orgullo exagerado
+  - La Viejuna del Bar - Nostalgia gruñona
+  - El Yonki Zen del Parque - Filosofía callejera
+  - El Chulo de Barrio - Desafiante y seguro
 
 - **📏 Longitud**: Corto (2-3 frases), Medio (5-7 frases), Largo (10-15 frases)
 - **🌐 Idioma**: Español 🇪🇸, English 🇺🇸, Français 🇫🇷, Português 🇧🇷
@@ -321,7 +353,7 @@ Si Al-Grano Bot te resulta útil y quieres apoyar su desarrollo y mantenimiento:
 
 - **Idiomas soportados**: 4 (Español, Inglés, Francés, Portugués)
 - **Formatos de archivo**: 10+ tipos diferentes
-- **Tonos de resumen**: 6 opciones únicas
+- **Tonos de resumen**: 38 opciones únicas
 - **APIs integradas**: OpenRouter + OpenAI
 - **Arquitectura**: Modular y escalable
 - **Tipo de base de datos**: SQLite con operaciones asíncronas
