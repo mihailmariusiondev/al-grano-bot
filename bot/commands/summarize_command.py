@@ -12,7 +12,7 @@ from bot.utils.constants import (
     YOUTUBE_REGEX, ARTICLE_URL_REGEX, MAX_RECENT_MESSAGES,
     COOLDOWN_TEXT_SIMPLE_SECONDS, COOLDOWN_ADVANCED_SECONDS,
     DAILY_LIMIT_ADVANCED_OPS, OPERATION_TYPE_TEXT_SIMPLE, OPERATION_TYPE_ADVANCED,
-    MSG_DAILY_LIMIT_REACHED, MSG_COOLDOWN_ACTIVE
+    MSG_DAILY_LIMIT_REACHED, MSG_COOLDOWN_ACTIVE, get_button_label
 )
 from bot.services import db_service, openai_service
 from bot.handlers.youtube_handler import youtube_handler
@@ -227,6 +227,15 @@ async def summarize_command(update: Update, context: CallbackContext):
                     summary_config=chat_config
                 )
                 logger.debug(f"Summary generated, length: {len(summary)} chars")
+
+                # Obtener el nombre del tono en el idioma correcto
+                tone_key = chat_config.get("tone", "neutral")
+                lang_key = chat_config.get("language", "es")
+                tone_name = get_button_label("tone", tone_key, lang_key)
+
+                # Prepend the tone to the summary
+                final_summary = f"🧠 *Tono: {tone_name}*\n\n{summary}"
+
             except ValueError as e:
                 logger.error(f"ValueError in summary generation: {e}")
                 # Handle unsupported language
@@ -242,7 +251,7 @@ async def summarize_command(update: Update, context: CallbackContext):
                 return
 
             await update_progress(wait_message, PROGRESS_MESSAGES["FINALIZING"])
-            await send_long_message(update, summary)
+            await send_long_message(update, final_summary)
             logger.info("Chat history summary completed successfully")
         else:
             logger.debug("Processing reply message")
@@ -342,6 +351,12 @@ async def summarize_command(update: Update, context: CallbackContext):
                     logger.info(f"Calling OpenAI service for {summary_type} summary")
                     summary = await openai_service.get_summary(content_for_summary, summary_type, reply_config)
                     logger.debug(f"Reply summary generated, length: {len(summary)}")
+
+                    # Obtener el nombre del tono en el idioma correcto
+                    tone_key = reply_config.get("tone", "neutral")
+                    lang_key = reply_config.get("language", "es")
+                    tone_name = get_button_label("tone", tone_key, lang_key)
+                    final_summary = f"🧠 *Tono: {tone_name}*\n\n{summary}"
 
                     await update_progress(wait_message, PROGRESS_MESSAGES["FINALIZING"])
                     await send_long_message(update, summary)
