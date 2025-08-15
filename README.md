@@ -62,7 +62,7 @@ Para usuarios no administradores:
 
 ### **Arquitectura de IA Híbrida**
 
-- **OpenRouter API**: Para generación de resúmenes (modelos como `deepseek/deepseek-r1-0528-qwen3-8b`)
+- **OpenRouter API**: Para generación de resúmenes (modelo `deepseek/deepseek-r1-0528:free`)
 - **OpenAI API directa**: Exclusivamente para transcripción con Whisper
 - Sistema de prompts modular y personalizable
 
@@ -152,8 +152,7 @@ OPENAI_API_KEY="TU_CLAVE_DE_API_DE_OPENAI"
 # Configuración OpenRouter
 # OPENROUTER_SITE_URL="https://github.com/mihailmariusiondev/al-grano-bot"
 # OPENROUTER_SITE_NAME="Al-Grano Bot"
-# OPENROUTER_PRIMARY_MODEL="deepseek/deepseek-r1-0528-qwen3-8b:free"
-# OPENROUTER_FALLBACK_MODEL="deepseek/deepseek-r1-0528-qwen3-8b"
+# OPENROUTER_MODEL="deepseek/deepseek-r1-0528:free"
 ```
 
 ### 4. **Configurar Administradores**

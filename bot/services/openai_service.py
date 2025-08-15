@@ -27,15 +27,15 @@ SummaryType = Literal[
 
 class OpenAIService:
     _instance = None
-    # Context length for deepseek/deepseek-r1-0528-qwen3-8b:free is 131K tokens.
+    # Context length for deepseek/deepseek-r1-0528:free is 131K tokens.
     # 1 token ~= 3.5 caracteres (estimación).
     # Max input characters for raw text, before system prompts and reserving space for output.
     # Using a safety margin (e.g., 75% of (total_tokens * chars_per_token)).
     # This leaves 25% for system prompt, user prompt structure, and model output.
-    PRIMARY_MODEL_MAX_TOKENS = 131000 # Max tokens for deepseek/deepseek-r1-0528-qwen3-8b:free (input + output)
+    MODEL_MAX_TOKENS = 131000 # Max tokens for deepseek/deepseek-r1-0528:free (input + output)
     CHARS_PER_TOKEN_ESTIMATE = 3.5
-    # Calculate max input characters for the primary model, used for chunking
-    MAX_INPUT_CHARS_PRIMARY_MODEL = int(PRIMARY_MODEL_MAX_TOKENS * CHARS_PER_TOKEN_ESTIMATE * 0.75)
+    # Calculate max input characters for the model, used for chunking
+    MAX_INPUT_CHARS_MODEL = int(MODEL_MAX_TOKENS * CHARS_PER_TOKEN_ESTIMATE * 0.75)
 
     def __new__(cls):
         if cls._instance == None:
@@ -66,7 +66,7 @@ class OpenAIService:
             }
             self.logger = logger.get_logger("openai_service")
             self.initialized = True
-            self.logger.info(f"OpenAIService initialized. OpenRouter Primary Model: {config.OPENROUTER_PRIMARY_MODEL}, Max input chars for chunking: {self.MAX_INPUT_CHARS_PRIMARY_MODEL}")
+            self.logger.info(f"OpenAIService initialized. OpenRouter Model: {config.OPENROUTER_MODEL}, Max input chars for chunking: {self.MAX_INPUT_CHARS_MODEL}")
 
     async def _execute_chat_completion(
         self,
@@ -139,28 +139,12 @@ class OpenAIService:
             return response_content
         except Exception as e:
             self.logger.error(f"Chat completion failed for model {model}: {e}", exc_info=True)
-            # Intentar con fallback si es OpenRouter y el modelo es el primario
-            if client == self.openrouter_client and model == config.OPENROUTER_PRIMARY_MODEL and config.OPENROUTER_FALLBACK_MODEL:
-                self.logger.warning(f"Primary model {model} failed. Attempting fallback to {config.OPENROUTER_FALLBACK_MODEL}")
-                try:
-                    response = await client.chat.completions.create(
-                        model=config.OPENROUTER_FALLBACK_MODEL,
-                        messages=messages,
-                        temperature=temperature,
-                        max_tokens=max_tokens, # Fallback model deepseek/deepseek-r1-0528-qwen3-8b might have max_output_tokens of 32K.
-                                               # If None, OpenRouter/Novita might use this default or another.
-                        extra_headers=extra_headers if extra_headers else None
-                    )
-                    return response.choices[0].message.content
-                except Exception as fallback_e:
-                    self.logger.error(f"Fallback model {config.OPENROUTER_FALLBACK_MODEL} also failed: {fallback_e}", exc_info=True)
-                    raise RuntimeError(f"Failed to process chat completion with primary and fallback models: {str(fallback_e)}") from fallback_e
             raise RuntimeError(f"Failed to process chat completion: {str(e)}") from e
 
     async def chat_completion_openrouter(
         self,
         messages: List[Dict[str, str]],
-        model: str = config.OPENROUTER_PRIMARY_MODEL,
+        model: str = config.OPENROUTER_MODEL,
         temperature: float = 0.7,
         max_tokens: Optional[int] = None,
     ) -> str:
@@ -278,7 +262,7 @@ class OpenAIService:
         ]
 
         # Usar el modelo primario por defecto
-        model = summary_config.get("model", config.OPENROUTER_PRIMARY_MODEL) # Using the imported config module for the default model
+        model = summary_config.get("model", config.OPENROUTER_MODEL) # Using the imported config module for the default model
         self.logger.info(f"Using model: {model} for summary type: {summary_type}")
 
         try:
@@ -301,29 +285,29 @@ class OpenAIService:
                 f"Iniciando procesamiento de documento de {text_length} caracteres"
             )
             # Usar la constante de clase para el límite de caracteres
-            if text_length < self.MAX_INPUT_CHARS_PRIMARY_MODEL:
+            if text_length < self.MAX_INPUT_CHARS_MODEL:
                 self.logger.info(
-                    f"Documento dentro del límite ({text_length}/{self.MAX_INPUT_CHARS_PRIMARY_MODEL}). "
-                    f"Procesando directamente con {config.OPENROUTER_PRIMARY_MODEL}"
+                    f"Documento dentro del límite ({text_length}/{self.MAX_INPUT_CHARS_MODEL}). "
+                    f"Procesando directamente con {config.OPENROUTER_MODEL}"
                 )
                 return await self.get_summary(
                     content=text,
                     summary_type="document",
-                    summary_config={"language": language, "model": config.OPENROUTER_PRIMARY_MODEL}
+                    summary_config={"language": language, "model": config.OPENROUTER_MODEL}
                 )
-            self.logger.info(f"Documento excede el límite ({text_length}/{self.MAX_INPUT_CHARS_PRIMARY_MODEL}). Dividiendo en chunks...")
+            self.logger.info(f"Documento excede el límite ({text_length}/{self.MAX_INPUT_CHARS_MODEL}). Dividiendo en chunks...")
             # Adjust chunk_size slightly for safety, ensuring system prompt + user content fits
-            chunk_processing_size = int(self.MAX_INPUT_CHARS_PRIMARY_MODEL * 0.95)
+            chunk_processing_size = int(self.MAX_INPUT_CHARS_MODEL * 0.95)
             chunks = chunk_text(text, chunk_size=chunk_processing_size)
             self.logger.info(f"Documento dividido en {len(chunks)} chunks")
             self.logger.info(
-                f"Iniciando procesamiento paralelo de chunks con {config.OPENROUTER_PRIMARY_MODEL} (o fallback si es necesario)"
+                f"Iniciando procesamiento paralelo de chunks con {config.OPENROUTER_MODEL}"
             )
             tasks = [
                 self.get_summary(
                     content=chunk,
                     summary_type="document",
-                    summary_config={"language": language, "model": config.OPENROUTER_PRIMARY_MODEL}
+                    summary_config={"language": language, "model": config.OPENROUTER_MODEL}
                 )
                 for chunk in chunks
             ]
@@ -344,14 +328,14 @@ class OpenAIService:
                     "Solo un chunk procesado exitosamente (o era un solo chunk), retornando resumen directamente"
                 )
                 return successful_summaries[0]
-            self.logger.info(f"Generando resumen final con {config.OPENROUTER_PRIMARY_MODEL} a partir de {len(successful_summaries)} resúmenes de chunks")
+            self.logger.info(f"Generando resumen final con {config.OPENROUTER_MODEL} a partir de {len(successful_summaries)} resúmenes de chunks")
             combined_summaries = "\n\n".join(successful_summaries)
             self.logger.info(
                 f"Longitud total de resúmenes combinados: {len(combined_summaries)} caracteres"
             )
 
-            if len(combined_summaries) > self.MAX_INPUT_CHARS_PRIMARY_MODEL:
-                self.logger.warning(f"Los resúmenes combinados ({len(combined_summaries)} chars) exceden MAX_INPUT_CHARS ({self.MAX_INPUT_CHARS_PRIMARY_MODEL}). Se enviará tal cual, confiando en que el modelo maneje la longitud o se ajuste MAX_INPUT_CHARS si es necesario en el futuro.")
+            if len(combined_summaries) > self.MAX_INPUT_CHARS_MODEL:
+                self.logger.warning(f"Los resúmenes combinados ({len(combined_summaries)} chars) exceden MAX_INPUT_CHARS ({self.MAX_INPUT_CHARS_MODEL}). Se enviará tal cual, confiando en que el modelo maneje la longitud o se ajuste MAX_INPUT_CHARS si es necesario en el futuro.")
 
             final_summary_prompt_content = (
                 "Se han procesado varias partes de un documento extenso. "
@@ -364,7 +348,7 @@ class OpenAIService:
             final_summary = await self.get_summary(
                 content=final_summary_prompt_content,
                 summary_type="document",
-                summary_config={"language": language, "model": config.OPENROUTER_PRIMARY_MODEL}
+                summary_config={"language": language, "model": config.OPENROUTER_MODEL}
             )
             self.logger.info(
                 f"Resumen final generado. Longitud: {len(final_summary)} caracteres"
