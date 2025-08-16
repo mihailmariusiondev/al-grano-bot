@@ -325,6 +325,24 @@ Si Al-Grano Bot te resulta útil y quieres apoyar su desarrollo y mantenimiento:
 - **Arquitectura**: Modular y escalable
 - **Tipo de base de datos**: SQLite con operaciones asíncronas
 
----
+### 🛠️ Mejoras
 
+#### 🚧 Sistema de Verificación Inteligente (Mejora Futura)
+
+Integrar un flujo de verificación para comprobar afirmaciones en los chats:
+
+1. **Detección de intención**: identificar mensajes que pidan verificar algo. *Recomendación mínima:* expresiones regulares o modelo ligero.
+2. **Extracción de la afirmación**: obtener la frase a verificar usando el historial. *Recomendación mínima:* mantener un buffer corto de mensajes.
+3. **Reformular la consulta**: convertir la afirmación en una búsqueda web útil. *Recomendación mínima:* plantilla simple o modelo rápido.
+4. **Decidir si buscar**: usar un modelo rápido para determinar si es necesario consultar la web. Paso crítico para ganar velocidad.
+5. **Buscar en la web**: si procede, obtener 2–3 enlaces (p.ej. de DuckDuckGo). *Recomendación mínima:* scraping directo sin API.
+6. **Scraping y limpieza**: extraer solo el texto relevante de cada enlace. *Recomendación mínima:* utilizar `trafilatura`.
+7. **Preparar el contexto**: reunir los textos y la pregunta original.
+8. **Razonar con la IA**: generar la respuesta final con el modelo elegido.
+9. **Responder en Telegram**: enviar la conclusión al usuario, opcionalmente con fuentes.
+
+Este sistema debe funcionar rápidamente y sin depender de APIs de pago.
+
+Consulta [docs/sistema_verificacion_inteligente.md](docs/sistema_verificacion_inteligente.md) para leer la propuesta completa paso a paso.
+---
 _¡Obtén tus resúmenes al grano con la potencia de la IA! 🚀_
