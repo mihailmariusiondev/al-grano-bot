@@ -156,4 +156,4 @@ def extract_text_from_docx(file_bytes: bytearray) -> str:
 
     except Exception as e:
         logger.error(f"Error extracting text from DOCX: {e}", exc_info=True)
-        raise ValueError(f"Error al procesar documento DOCX: {str(e)}")
+        raise ValueError("No se pudo extraer contenido del documento DOCX")

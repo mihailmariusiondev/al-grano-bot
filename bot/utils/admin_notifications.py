@@ -6,7 +6,6 @@ Ensures admins are notified of all critical errors.
 
 from typing import Optional, List
 from telegram.ext import ContextTypes
-from ..services import db_service
 from ..utils.logger import logger
 
 logger_instance = logger.get_logger(__name__)
@@ -29,6 +28,8 @@ async def notify_admins_critical(
         chat_id: Chat ID where error occurred (optional)
     """
     try:
+        # Import here to avoid circular import
+        from ..services.database_service import db_service
         admin_users = await db_service.get_admin_users()
         
         if not admin_users:
@@ -91,6 +92,8 @@ async def notify_admins_warning(
         chat_id: Chat ID where warning occurred (optional)
     """
     try:
+        # Import here to avoid circular import
+        from ..services.database_service import db_service
         admin_users = await db_service.get_admin_users()
         
         if not admin_users:

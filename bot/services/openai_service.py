@@ -387,7 +387,7 @@ class OpenAIService:
                     successful_summaries.append(summary)
             if not successful_summaries:
                 self.logger.error("Todos los chunks fallaron al ser procesados.")
-                raise RuntimeError("No se pudo procesar ningún chunk del documento.")
+                raise RuntimeError("Document processing failed - no content could be extracted")
             self.logger.info(f"Procesados {len(successful_summaries)} chunks exitosamente de {len(chunks)}")
             if len(successful_summaries) == 1:
                 self.logger.info(

@@ -310,7 +310,7 @@ async def summarize_command(update: Update, context: CallbackContext):
                         content_for_summary = await document_handler(reply_msg, context)
                         if not content_for_summary:
                             logger.error("Document handler returned empty content")
-                            raise ValueError("No se pudo extraer contenido del documento")
+                            raise ValueError("Document content extraction failed")
 
                         logger.debug(f"Document content extracted, length: {len(content_for_summary)}")
                         await update_progress(wait_message, PROGRESS_MESSAGES["SUMMARIZING"])
