@@ -7,6 +7,7 @@ from bot.utils.format_utils import format_recent_messages
 from bot.utils.logger import logger
 from bot.services.message_service import message_service
 from bot.utils.constants import MAX_RECENT_MESSAGES
+from bot.constants import USER_ERROR_MESSAGES
 
 logger = logger.get_logger(__name__)
 
@@ -91,10 +92,10 @@ async def generate_daily_summary(chat_id: int) -> str:
         return final_summary
     except Exception as e:
         logger.error(f"Error generating daily summary: {e}", exc_info=True)
-        error_msg = (
-            "❌ Error al generar el resumen diario.\n"
-            "Por favor, contacta con el administrador si el problema persiste."
-        )
+        error_msg = USER_ERROR_MESSAGES["SERVICE_UNAVAILABLE"]
+        
+        # Log for admin notification (context not available here)
+        logger.critical(f"ADMIN_NOTIFY: Daily summary generation failed for chat {chat_id}: {str(e)}")
         return error_msg
 
 

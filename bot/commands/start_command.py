@@ -3,6 +3,7 @@ from bot.services import db_service
 from bot.utils.decorators import log_command
 from bot.utils.logger import logger
 from telegram.ext import ContextTypes
+from bot.constants import USER_ERROR_MESSAGES
 
 logger = logger.get_logger(__name__)
 
@@ -83,6 +84,6 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.error(f"=== START COMMAND FAILED ===")
         logger.error(f"Error en start_command for user {user.id}: {e}", exc_info=True)
         try:
-            await update.message.reply_text("Error al inicializar el bot. Por favor, inténtalo de nuevo.")
+            await update.message.reply_text(USER_ERROR_MESSAGES["GENERAL_ERROR"])
         except:
             logger.error("Failed to send error message to user")

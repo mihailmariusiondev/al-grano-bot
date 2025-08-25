@@ -11,6 +11,7 @@ from bot.prompts.prompt_modifiers import (
 )
 from bot.config import config
 from bot.constants import FALLBACK_MODELS, RATE_LIMIT_RETRY_DELAY
+from bot.utils.admin_notifications import notify_admins_rate_limit, notify_admins_service_error
 
 # SummaryType Literal, debe coincidir con las claves en ALL_SUMMARY_PROMPTS
 SummaryType = Literal[
@@ -185,6 +186,13 @@ class OpenAIService:
                 
                 if i > 0:  # Used fallback
                     self.logger.info(f"✅ Fallback successful with model: {current_model}")
+                    # Notify admin about successful fallback (non-blocking)
+                    original_model = models_to_try[0]
+                    try:
+                        # We don't have context here, but we can log it for admin review
+                        self.logger.info(f"ADMIN_NOTIFY: Rate limit fallback used - {original_model} -> {current_model}")
+                    except:
+                        pass  # Don't fail the request if notification fails
                 
                 return result
                 
@@ -197,7 +205,9 @@ class OpenAIService:
                     self.logger.warning(f"⚠️ Rate limit hit for {current_model}: {e}")
                     
                     if i < len(models_to_try) - 1:  # Not the last model
+                        next_model = models_to_try[i + 1]
                         self.logger.info(f"⏳ Waiting {RATE_LIMIT_RETRY_DELAY}s before trying next model...")
+                        # No need to await notify here as it will be handled if we succeed with fallback
                         await asyncio.sleep(RATE_LIMIT_RETRY_DELAY)
                         continue
                 else:
@@ -207,6 +217,10 @@ class OpenAIService:
         
         # All models failed
         self.logger.error(f"🚫 ALL {len(models_to_try)} MODELS FAILED. Last error: {last_exception}")
+        
+        # Log for admin notification (context not available here)
+        self.logger.critical(f"ADMIN_NOTIFY: All fallback models exhausted - Service unavailable")
+        
         raise RuntimeError(f"All fallback models exhausted. Last error: {str(last_exception)}") from last_exception
 
     async def transcribe_audio(

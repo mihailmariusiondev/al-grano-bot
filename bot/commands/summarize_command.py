@@ -14,6 +14,7 @@ from bot.utils.constants import (
     DAILY_LIMIT_ADVANCED_OPS, OPERATION_TYPE_TEXT_SIMPLE, OPERATION_TYPE_ADVANCED,
     MSG_DAILY_LIMIT_REACHED, MSG_COOLDOWN_ACTIVE, get_button_label
 )
+from bot.constants import USER_ERROR_MESSAGES, COMMAND_MESSAGES
 from bot.services import db_service, openai_service
 from bot.handlers.youtube_handler import youtube_handler
 from bot.handlers.video_handler import video_handler
@@ -23,19 +24,18 @@ from bot.handlers.document_handler import document_handler
 import asyncio
 from datetime import datetime,  date
 
-ERROR_MESSAGES = {
-    "NOT_ENOUGH_MESSAGES": "No hay suficientes mensajes para resumir. O me das 5 mensajes o te mando a la mierda",
-    "ERROR_SUMMARIZING": "Error al resumir los mensajes. Ya la hemos liao...",
-    "ERROR_INVALID_YOUTUBE_URL": "URL de YouTube inválida. Eres tonto o qué?..",
-    "ERROR_NOT_REPLYING_TO_MESSAGE": "No estás respondiendo a ningún mensaje. No me toques los co",
-    "ERROR_TRANSCRIPT_DISABLED": "Transcripción deshabilitada para este vídeo. No me presiones tronco",
-    "ERROR_CANNOT_SUMMARIZE_ARTICLE": "Pues va a ser que el artículo este no tiene chicha que resumir.",
-    "ERROR_EMPTY_SUMMARY": "Error: El resumen está vacío. Parece que no había nada importante que decir, joder.",
-    "ERROR_INVALID_SUMMARY": "Error: El resumen es inválido. Puede que haya entendido algo mal, coño.",
-    "ERROR_UNKNOWN": "Error: Algo ha ido mal al resumir. No tengo ni puta idea de qué ha pasado.",
-    "ERROR_PROCESSING_VIDEO_NOTE": "Error: No he podido procesar el video circular. Dale otra vez, figura.",
-    "ERROR_PROCESSING_DOCUMENT": "Error: Este documento me ha dejado pillado. Prueba con otro formato, crack.",
-    "ERROR_UNSUPPORTED_DOCUMENT": "Error: Este tipo de documento no lo manejo todavía, máquina.",
+from bot.utils.admin_notifications import (
+    notify_admins_critical, 
+    notify_admins_service_error, 
+    notify_admins_rate_limit
+)
+
+# Legacy error messages - converted to user-friendly messages
+LOCAL_MESSAGES = {
+    "NOT_ENOUGH_MESSAGES": "No hay suficientes mensajes para resumir.",
+    "EMPTY_SUMMARY": "El contenido no pudo ser procesado completamente.",
+    "INVALID_SUMMARY": "Hubo un problema procesando el contenido.",
+    "PROCESSING_FAILED": "No pude procesar este tipo de contenido."
 }
 
 PROGRESS_MESSAGES = {
@@ -116,7 +116,7 @@ async def summarize_command(update: Update, context: CallbackContext):
 
         if not operation_type:
             logger.error("Could not determine operation type")
-            await update.message.reply_text("No se pudo determinar el tipo de operación de resumen.")
+            await update.message.reply_text(COMMAND_MESSAGES["SUMMARIZE"]["NO_CONTENT"])
             return
 
         logger.info(f"Final operation type determined: {operation_type}")
@@ -194,7 +194,7 @@ async def summarize_command(update: Update, context: CallbackContext):
         else:
             logger.debug("User is admin, skipping all limits")
 
-        wait_message = await update.message.reply_text("⏳ Procesando tu solicitud...")
+        wait_message = await update.message.reply_text(COMMAND_MESSAGES["SUMMARIZE"]["PROCESSING"])
         logger.debug("Wait message sent, starting content processing")
 
         # 3. Content Processing
@@ -208,7 +208,7 @@ async def summarize_command(update: Update, context: CallbackContext):
 
             if len(recent_messages) < 5:
                 logger.warning(f"Not enough messages ({len(recent_messages)}) for summary")
-                await wait_message.edit_text(ERROR_MESSAGES["NOT_ENOUGH_MESSAGES"])
+                await wait_message.edit_text(COMMAND_MESSAGES["SUMMARIZE"]["NO_CONTENT"])
                 return
 
             await update_progress(wait_message, PROGRESS_MESSAGES["FORMATTING"])
@@ -240,14 +240,14 @@ async def summarize_command(update: Update, context: CallbackContext):
                 logger.error(f"ValueError in summary generation: {e}")
                 # Handle unsupported language
                 if "is not supported" in str(e):
-                    await wait_message.edit_text(f"Error: {str(e)}. Por favor, configura un idioma soportado con /configurar_resumen.")
+                    await wait_message.edit_text(COMMAND_MESSAGES["SUMMARIZE"]["LANGUAGE_ERROR"])
                     return
                 else:
-                    await wait_message.edit_text(f"Error al generar el resumen: {str(e)}")
+                    await wait_message.edit_text(USER_ERROR_MESSAGES["PROCESSING_ERROR"])
                     return
             except Exception as e:
                 logger.error(f"Unexpected error in summary generation: {e}", exc_info=True)
-                await wait_message.edit_text(f"Error inesperado al generar el resumen: {str(e)}")
+                await wait_message.edit_text(USER_ERROR_MESSAGES["GENERAL_ERROR"])
                 return
 
             await update_progress(wait_message, PROGRESS_MESSAGES["FINALIZING"])
@@ -338,7 +338,7 @@ async def summarize_command(update: Update, context: CallbackContext):
                         await wait_message.edit_text(
                             ERROR_MESSAGES.get(
                                 f"ERROR_CANNOT_SUMMARIZE_{message_type_for_handler.upper()}",
-                                ERROR_MESSAGES["ERROR_EMPTY_SUMMARY"],
+                                USER_ERROR_MESSAGES["PROCESSING_ERROR"],
                             )
                         )
                         return
@@ -370,16 +370,20 @@ async def summarize_command(update: Update, context: CallbackContext):
                     await wait_message.edit_text(
                         ERROR_MESSAGES.get(
                             f"ERROR_CANNOT_SUMMARIZE_{message_type_for_handler.upper()}",
-                            ERROR_MESSAGES["ERROR_UNKNOWN"],
+                            USER_ERROR_MESSAGES["GENERAL_ERROR"],
                         )
                     )
                     return
             except Exception as e:
                 logger.error(f"Error procesando mensaje: {str(e)}", exc_info=True)
+                await notify_admins_service_error(
+                    context, "Message Processing", str(e),
+                    user_tg.id if user_tg else None, update.effective_chat.id
+                )
                 if wait_message:
-                    await wait_message.edit_text(f"Error procesando el mensaje: {str(e)}")
+                    await wait_message.edit_text(USER_ERROR_MESSAGES["PROCESSING_ERROR"])
                 else:
-                    await update.message.reply_text(f"Error procesando el mensaje: {str(e)}")
+                    await update.message.reply_text(USER_ERROR_MESSAGES["PROCESSING_ERROR"])
                 return
 
         # 4. Update Usage Data (if not admin)
@@ -413,13 +417,17 @@ async def summarize_command(update: Update, context: CallbackContext):
     except Exception as e:
         logger.error(f"=== SUMMARIZE COMMAND FAILED FOR USER {user_tg.id if user_tg else 'UNKNOWN'} ===")
         logger.error(f"Error in summarize_command: {e}", exc_info=True)
+        await notify_admins_critical(
+            context, "Summarize Command Failed", str(e),
+            user_tg.id if user_tg else None, update.effective_chat.id
+        )
         if wait_message:
             try:
-                await wait_message.edit_text(f"Error al procesar la solicitud: {str(e)}")
+                await wait_message.edit_text(USER_ERROR_MESSAGES["GENERAL_ERROR"])
             except Exception as edit_error:
                 logger.error(f"Could not edit wait message with error: {edit_error}")
         else:
             try:
-                await update.message.reply_text(f"Error al procesar la solicitud: {str(e)}")
+                await update.message.reply_text(USER_ERROR_MESSAGES["GENERAL_ERROR"])
             except Exception as reply_error:
                 logger.error(f"Could not send error message: {reply_error}")

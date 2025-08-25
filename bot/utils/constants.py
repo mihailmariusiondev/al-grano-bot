@@ -156,7 +156,7 @@ LABELS = {
         "confirm_daily_off": "Resumen diario desactivado",
         "confirm_daily_hour": "Resumen diario programado para las",
         # Error messages
-        "error_db": "Error al actualizar la configuración. Inténtalo de nuevo.",
+        "error_db": "No pude actualizar la configuración. Inténtalo de nuevo.",
         "invalid_option": "Opción no válida.",
         "not_admin": "Solo los administradores pueden cambiar la configuración del chat.",
     },
@@ -255,7 +255,7 @@ LABELS = {
         "confirm_daily_off": "Daily summary disabled",
         "confirm_daily_hour": "Daily summary scheduled for",
         # Error messages
-        "error_db": "Error updating configuration. Please try again.",
+        "error_db": "Could not update configuration. Please try again.",
         "invalid_option": "Invalid option.",
         "not_admin": "Only administrators can change chat configuration.",
     },

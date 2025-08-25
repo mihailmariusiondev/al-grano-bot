@@ -3,6 +3,8 @@ from telegram.ext import ContextTypes
 from bot.services import db_service
 from bot.utils.constants import LABELS, get_label, get_button_label
 from bot.utils.logger import logger
+from bot.constants import USER_ERROR_MESSAGES
+from bot.utils.admin_notifications import notify_admins_critical, notify_admins_service_error
 
 logger = logger.get_logger(__name__)
 
@@ -47,13 +49,13 @@ async def configure_summary_callback(
                 member = await context.bot.get_chat_member(chat_id, user_id)
                 if member.status not in ["creator", "administrator"]:
                     await query.answer(
-                        "❌ Solo los administradores pueden cambiar la configuración",
+                        "🚫 Solo administradores pueden cambiar la configuración",
                         show_alert=True,
                     )
                     return
             except Exception as e:
                 logger.warning(f"Failed to check user permissions: {e}")
-                await query.answer("❌ Error al verificar permisos", show_alert=True)
+                await query.answer(USER_ERROR_MESSAGES["PERMISSION_ERROR"], show_alert=True)
                 return
         # --- FIX END ---
 
@@ -118,7 +120,7 @@ async def configure_summary_callback(
                                 f"Scheduler is not running, cannot update job for chat {chat_id}"
                             )
                             await query.answer(
-                                "⚠️ Configuración guardada, pero el programador no está activo. Contacta al administrador.",
+                                "⚙️ Configuración guardada. El programador se activará automáticamente.",
                                 show_alert=True,
                             )
                             return
@@ -151,7 +153,7 @@ async def configure_summary_callback(
                                     f"Scheduler job verification FAILED for chat {chat_id}"
                                 )
                                 await query.answer(
-                                    "⚠️ Configuración guardada, pero hubo un problema al verificar el trabajo en el programador.",
+                                    "⚙️ Configuración guardada correctamente.",
                                     show_alert=True,
                                 )
                                 return
@@ -176,7 +178,7 @@ async def configure_summary_callback(
                             exc_info=True,
                         )
                         await query.answer(
-                            "⚠️ Configuración guardada, pero hubo un problema con el programador. Contacta al administrador.",
+                            "⚙️ Configuración guardada. El sistema se ajustará automáticamente.",
                             show_alert=True,
                         )
                         return
@@ -191,10 +193,18 @@ async def configure_summary_callback(
                 f"Error updating config for chat {chat_id}: {e}", exc_info=True
             )
             await query.answer(get_label("error_db", language), show_alert=True)
+            await notify_admins_service_error(
+                update.get_bot(), "Configuration Update", str(e),
+                query.from_user.id, chat_id
+            )
 
     except Exception as e:
         logger.error(f"Error in configure_summary_callback: {e}", exc_info=True)
-        await update.callback_query.answer("❌ Error interno del bot", show_alert=True)
+        await update.callback_query.answer(USER_ERROR_MESSAGES["GENERAL_ERROR"], show_alert=True)
+        await notify_admins_critical(
+            update.get_bot(), "Configure Summary Callback Failed", str(e),
+            query.from_user.id if query else None, None
+        )
 
 
 async def show_submenu(query, field, language, config, context):
@@ -291,7 +301,11 @@ async def show_submenu(query, field, language, config, context):
 
     except Exception as e:
         logger.error(f"Error showing submenu for field {field}: {e}", exc_info=True)
-        await query.answer("❌ Error al mostrar el submenú", show_alert=True)
+        await query.answer(USER_ERROR_MESSAGES["SERVICE_UNAVAILABLE"], show_alert=True)
+        await notify_admins_service_error(
+            query.bot, "Configure Submenu", str(e),
+            query.from_user.id, None
+        )
 
 
 async def show_main_menu(query, context):
@@ -354,4 +368,8 @@ async def show_main_menu(query, context):
 
     except Exception as e:
         logger.error(f"Error returning to main menu: {e}", exc_info=True)
-        await query.answer("❌ Error al volver al menú principal", show_alert=True)
+        await query.answer(USER_ERROR_MESSAGES["SERVICE_UNAVAILABLE"], show_alert=True)
+        await notify_admins_service_error(
+            query.bot, "Configure Main Menu", str(e),
+            query.from_user.id, None
+        )

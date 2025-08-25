@@ -3,6 +3,8 @@ from telegram.ext import ContextTypes
 from telegram.error import TelegramError, BadRequest, TimedOut, NetworkError, RetryAfter
 from ..utils.logger import logger
 from ..services import db_service
+from ..constants import USER_ERROR_MESSAGES
+from ..utils.admin_notifications import notify_admins_critical, notify_admins_warning
 import traceback
 import sys
 
@@ -58,7 +60,7 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
                     f"Context: {context}")
         if update and hasattr(update, "effective_message"):
             await update.effective_message.reply_text(
-                "Lo siento, no pude procesar tu solicitud. Por favor, inténtalo de nuevo."
+                USER_ERROR_MESSAGES["INVALID_REQUEST"]
             )
 
     except TimedOut as e:
@@ -69,7 +71,7 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
                       f"Context: {context}")
         if update and hasattr(update, "effective_message"):
             await update.effective_message.reply_text(
-                "El servidor está tardando en responder. Por favor, inténtalo de nuevo en unos momentos."
+                USER_ERROR_MESSAGES["TIMEOUT_ERROR"]
             )
 
     except NetworkError as e:
@@ -78,7 +80,7 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
                     f"Error: {str(e)}\n"
                     f"Update: {update}\n"
                     f"Context: {context}")
-        await notify_admins(context, f"Error de red detectado:\n{error_message}")
+        await notify_admins_critical(context, "Network Error", str(e), user_id, chat_id)
 
     except Exception as e:
         # Log detailed error information
@@ -96,7 +98,7 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
 
         if update and hasattr(update, "effective_message"):
             await update.effective_message.reply_text(
-                "Ha ocurrido un error al procesar tu solicitud. Por favor, inténtalo de nuevo."
+                USER_ERROR_MESSAGES["GENERAL_ERROR"]
             )
 
     finally:
@@ -147,9 +149,9 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
             )
 
         # Notify admins with detailed error information
-        error_report = (
-            f"Error Type: {type(context.error).__name__}\n"
-            f"Error Message: {str(context.error)}\n"
-            f"Update: {update}"
+        error_details = (
+            f"Type: {type(context.error).__name__}\n"
+            f"Message: {str(context.error)}\n"
+            f"Update: {str(update)[:500]}..."
         )
-        await notify_admins(context, error_report)
+        await notify_admins_critical(context, "Unhandled Exception", error_details, user_id, chat_id)

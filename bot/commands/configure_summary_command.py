@@ -4,6 +4,7 @@ from bot.services import db_service
 from bot.utils.constants import LABELS, get_label, get_button_label
 from bot.utils.decorators import log_command
 from bot.utils.logger import logger
+from bot.constants import USER_ERROR_MESSAGES
 
 logger = logger.get_logger(__name__)
 
@@ -74,5 +75,5 @@ async def configure_summary_command(update: Update, context: ContextTypes.DEFAUL
     except Exception as e:
         logger.error(f"Error in configure_summary_command: {e}", exc_info=True)
         await update.effective_message.reply_text(
-            "❌ Error al mostrar la configuración. Por favor, inténtalo de nuevo más tarde."
+            USER_ERROR_MESSAGES["CONFIGURATION_ERROR"]
         )

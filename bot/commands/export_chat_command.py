@@ -9,16 +9,15 @@ from bot.utils.decorators import log_command, bot_started
 from bot.services.database_service import db_service
 from bot.utils.logger import logger
 from bot.utils.constants import EXPORT_PROGRESS_BATCH_SIZE
+from bot.constants import USER_ERROR_MESSAGES, COMMAND_MESSAGES
+from bot.utils.admin_notifications import notify_admins_critical, notify_admins_service_error
 
 # Consistent with other commands
 logger = logger.get_logger(__name__)
 
-# Error messages following the project pattern
-ERROR_MESSAGES = {
-    "NO_MESSAGES": "No hay mensajes para exportar hoy.",
-    "EXPORT_ERROR": "❌ Error al exportar el chat.",
-    "FILE_CREATION_ERROR": "❌ Error al crear el archivo de exportación.",
-    "SEND_ERROR": "❌ Error al enviar el archivo."
+# Local messages
+LOCAL_MESSAGES = {
+    "NO_MESSAGES": "No hay mensajes para exportar hoy."
 }
 
 SUCCESS_MESSAGES = {
@@ -266,7 +265,11 @@ async def export_chat_command(update: Update, context: ContextTypes.DEFAULT_TYPE
 
         except Exception as file_error:
             logger.error(f"Error creating temporary file: {file_error}", exc_info=True)
-            await update.message.reply_text(ERROR_MESSAGES["FILE_CREATION_ERROR"])
+            await update.message.reply_text(USER_ERROR_MESSAGES["FILE_ERROR"])
+            await notify_admins_service_error(
+                context, "Export File Creation", str(file_error), 
+                update.effective_user.id, update.effective_chat.id
+            )
             return
 
         # Send the document
@@ -302,7 +305,11 @@ async def export_chat_command(update: Update, context: ContextTypes.DEFAULT_TYPE
 
         except Exception as send_error:
             logger.error(f"Error sending document: {send_error}", exc_info=True)
-            await update.message.reply_text(ERROR_MESSAGES["SEND_ERROR"])
+            await update.message.reply_text(USER_ERROR_MESSAGES["FILE_ERROR"])
+            await notify_admins_service_error(
+                context, "Export File Send", str(send_error),
+                update.effective_user.id, update.effective_chat.id
+            )
             return
         finally:
             # Clean up temporary file
@@ -317,6 +324,10 @@ async def export_chat_command(update: Update, context: ContextTypes.DEFAULT_TYPE
         logger.error(f"=== EXPORT CHAT COMMAND FAILED ===")
         logger.error(f"Error in export_chat_command for user {user.id}: {e}", exc_info=True)
         try:
-            await update.message.reply_text(ERROR_MESSAGES["EXPORT_ERROR"])
+            await update.message.reply_text(USER_ERROR_MESSAGES["GENERAL_ERROR"])
+            await notify_admins_critical(
+                context, "Export Chat Command Failed", str(e),
+                user.id, update.effective_chat.id
+            )
         except Exception as reply_error:
             logger.error(f"Failed to send error message to user: {reply_error}")
