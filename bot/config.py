@@ -1,5 +1,6 @@
 import os
 from typing import Optional, List, Set
+from bot.constants import DEFAULT_MODEL
 
 class Config:
     _instance = None
@@ -18,7 +19,7 @@ class Config:
             self.OPENROUTER_API_KEY: Optional[str] = None # For OpenRouter LLM calls
             self.OPENROUTER_SITE_URL: str = "https://github.com/mihailmariusiondev/al-grano-bot" # Default or example URL
             self.OPENROUTER_SITE_NAME: str = "Al-Grano Bot" # Default or example name
-            self.OPENROUTER_MODEL: str = "deepseek/deepseek-r1-0528:free"
+            self.OPENROUTER_MODEL: str = DEFAULT_MODEL
             # Database settings
             self.DB_PATH: str = "bot.db"
             # Other settings
@@ -34,7 +35,7 @@ class Config:
         self.OPENROUTER_SITE_URL = os.getenv("OPENROUTER_SITE_URL", self.OPENROUTER_SITE_URL)
         self.OPENROUTER_SITE_NAME = os.getenv("OPENROUTER_SITE_NAME", self.OPENROUTER_SITE_NAME)
         # Load model identifiers from env, with defaults
-        self.OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", self.OPENROUTER_MODEL)
+        self.OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", DEFAULT_MODEL)
         self.DB_PATH = os.getenv("DB_PATH", "bot.db")
         auto_admin_ids_str = os.getenv("AUTO_ADMIN_USER_IDS_CSV")
         if auto_admin_ids_str:

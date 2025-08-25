@@ -9,7 +9,8 @@ from bot.prompts.prompt_modifiers import (
     generate_length_modifier,
     generate_names_modifier,
 )
-from bot.config import config # Import config para acceder a los nombres de modelo y URLs
+from bot.config import config
+from bot.constants import FALLBACK_MODELS, RATE_LIMIT_RETRY_DELAY
 
 # SummaryType Literal, debe coincidir con las claves en ALL_SUMMARY_PROMPTS
 SummaryType = Literal[
@@ -148,14 +149,65 @@ class OpenAIService:
         temperature: float = 0.7,
         max_tokens: Optional[int] = None,
     ) -> str:
-        return await self._execute_chat_completion(
-            client=self.openrouter_client,
+        return await self._chat_completion_with_fallback(
             messages=messages,
             model=model,
             temperature=temperature,
-            max_tokens=max_tokens,
-            extra_headers=self.openrouter_extra_headers
+            max_tokens=max_tokens
         )
+
+    async def _chat_completion_with_fallback(
+        self,
+        messages: List[Dict[str, str]],
+        model: str,
+        temperature: float = 0.7,
+        max_tokens: Optional[int] = None,
+    ) -> str:
+        """Chat completion with automatic fallback on rate limits"""
+        
+        # Start with requested model, then try fallback models
+        models_to_try = [model] + [m for m in FALLBACK_MODELS if m != model]
+        
+        last_exception = None
+        
+        for i, current_model in enumerate(models_to_try):
+            try:
+                self.logger.info(f"Attempting model {i+1}/{len(models_to_try)}: {current_model}")
+                
+                result = await self._execute_chat_completion(
+                    client=self.openrouter_client,
+                    messages=messages,
+                    model=current_model,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                    extra_headers=self.openrouter_extra_headers
+                )
+                
+                if i > 0:  # Used fallback
+                    self.logger.info(f"✅ Fallback successful with model: {current_model}")
+                
+                return result
+                
+            except Exception as e:
+                error_msg = str(e).lower()
+                last_exception = e
+                
+                # Check if it's a rate limit error (429)
+                if "429" in error_msg or "rate limit" in error_msg or "quota" in error_msg:
+                    self.logger.warning(f"⚠️ Rate limit hit for {current_model}: {e}")
+                    
+                    if i < len(models_to_try) - 1:  # Not the last model
+                        self.logger.info(f"⏳ Waiting {RATE_LIMIT_RETRY_DELAY}s before trying next model...")
+                        await asyncio.sleep(RATE_LIMIT_RETRY_DELAY)
+                        continue
+                else:
+                    # Non-rate-limit error, log and continue
+                    self.logger.error(f"❌ Model {current_model} failed with non-rate-limit error: {e}")
+                    continue
+        
+        # All models failed
+        self.logger.error(f"🚫 ALL {len(models_to_try)} MODELS FAILED. Last error: {last_exception}")
+        raise RuntimeError(f"All fallback models exhausted. Last error: {str(last_exception)}") from last_exception
 
     async def transcribe_audio(
         self, file_path: str, model: str = "whisper-1", language: Optional[str] = None
@@ -261,9 +313,9 @@ class OpenAIService:
             {"role": "user", "content": content},
         ]
 
-        # Usar el modelo primario por defecto
-        model = summary_config.get("model", config.OPENROUTER_MODEL) # Using the imported config module for the default model
-        self.logger.info(f"Using model: {model} for summary type: {summary_type}")
+        # Usar el modelo primario por defecto con fallback automático
+        model = summary_config.get("model", config.OPENROUTER_MODEL)
+        self.logger.info(f"Using model: {model} for summary type: {summary_type} (with fallback)")
 
         try:
             result = await self.chat_completion_openrouter(messages, model=model)
@@ -271,7 +323,7 @@ class OpenAIService:
             self.logger.debug(f"Generated summary length: {len(result) if result else 0} chars")
             return result
         except Exception as e:
-            self.logger.error(f"Summary generation failed for type {summary_type}: {e}", exc_info=True)
+            self.logger.error(f"Summary generation failed for type {summary_type} (all models): {e}", exc_info=True)
             raise
 
     async def summarize_large_document(

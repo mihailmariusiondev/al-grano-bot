@@ -13,6 +13,20 @@ async def configure_summary_callback(
     """Handle callback queries from the configuration menu."""
     try:
         query = update.callback_query
+        
+        # Check if callback is too old
+        if not query:
+            logger.warning("No callback query found in update")
+            return
+            
+        try:
+            await query.answer()
+        except Exception as e:
+            if "Query is too old" in str(e) or "query id is invalid" in str(e):
+                logger.warning(f"Callback query too old or invalid: {e}")
+                return
+            else:
+                raise
         chat_id = update.effective_chat.id
         user_id = update.effective_user.id
 
@@ -82,9 +96,15 @@ async def configure_summary_callback(
                 else:
                     confirm_text = f"{get_label(f'confirm_{field}', language)} {get_button_label(field, str(value).lower(), language)}"
 
-                await query.answer(
-                    confirm_text
-                )  # If daily_summary_hour changed, update scheduler
+                try:
+                    await query.answer(confirm_text)
+                except Exception as e:
+                    if "Query is too old" in str(e) or "query id is invalid" in str(e):
+                        logger.warning(f"Cannot answer callback query - too old: {e}")
+                    else:
+                        raise
+                        
+                # If daily_summary_hour changed, update scheduler
                 if field == "daily_summary_hour":
                     logger.debug(
                         f"Daily summary hour changed to {value} for chat {chat_id}"
@@ -142,7 +162,13 @@ async def configure_summary_callback(
                         else:
                             final_confirm_text = confirm_text + confirm_text_details
 
-                        await query.answer(final_confirm_text)
+                        try:
+                            await query.answer(final_confirm_text)
+                        except Exception as e:
+                            if "Query is too old" in str(e) or "query id is invalid" in str(e):
+                                logger.warning(f"Cannot answer final confirmation - too old: {e}")
+                            else:
+                                raise
 
                     except Exception as e:
                         logger.error(
