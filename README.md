@@ -60,49 +60,21 @@ Para usuarios no administradores:
 - Transcripción de alta calidad usando **OpenAI Whisper** (modelo `whisper-1`)
 - Soporte para múltiples formatos de audio y video
 
-### **Arquitectura de IA Híbrida**
+### **IA Avanzada con Fallback**
 
-- **OpenRouter API**: Para generación de resúmenes (modelo `deepseek/deepseek-r1-0528:free`)
-- **OpenAI API directa**: Exclusivamente para transcripción con Whisper
-- Sistema de prompts modular y personalizable
+- **Sistema híbrido**: OpenRouter para resúmenes + OpenAI Whisper para transcripciones
+- **7 modelos de fallback** automático ante límites de velocidad
+- **Prompts personalizables** por tono, idioma y longitud
+- **Procesamiento inteligente** con map-reduce para documentos grandes
 
-### **Características Técnicas Avanzadas**
+> 🔧 **Para desarrolladores**: Consulta [CLAUDE.md](CLAUDE.md) para detalles técnicos de arquitectura, patrones de código y guías de desarrollo.
 
-- **Base de datos SQLite** con limpieza automática de mensajes antiguos
-- **Sistema de logging** detallado con manejo de errores global
-- **Programador de tareas** (APScheduler) para resúmenes diarios
-- **Manejo robusto de errores** con reintentos automáticos para problemas de formato
-- **Interfaz multiidioma** completa
-- **Decoradores personalizados** para logging, permisos y control de límites
+## 🛠️ Stack Tecnológico
 
-## 🛠️ Tecnologías Utilizadas
-
-### **Core Framework**
-
-- **Python 3.12** - Lenguaje base
-- **python-telegram-bot** - Framework del bot
-- **aiosqlite** - Base de datos asíncrona SQLite
-
-### **Inteligencia Artificial**
-
-- **OpenRouter API** - Generación de resúmenes con modelos avanzados
-- **OpenAI API** - Transcripción de audio con Whisper
-- **Sistema de prompts modular** - Configuración flexible de comportamiento de IA
-
-### **Procesamiento de Contenido**
-
-- **ffmpeg** - Procesamiento multimedia
-- **youtube-transcript-api** - Transcripciones de YouTube
-- **python-readability** - Extracción de contenido web
-- **python-docx** - Procesamiento de documentos Word
-- **PyPDF2** - Procesamiento de documentos PDF
-
-### **Servicios y Utilidades**
-
-- **APScheduler** - Programación de tareas
-- **python-dotenv** - Gestión de variables de entorno
-- **pytz** - Manejo de zonas horarias
-- **certifi** - Certificados SSL
+**Núcleo**: Python 3.12, python-telegram-bot, SQLite asíncrono
+**IA**: OpenRouter API, OpenAI Whisper, sistema de fallback multinivel
+**Multimedia**: ffmpeg, YouTube Transcript API, extractores de documentos
+**Infraestructura**: APScheduler, logging estructurado, decoradores personalizados
 
 ## 📋 Requisitos Previos
 
@@ -216,79 +188,24 @@ python main.py
 - Sin límites diarios
 - Acceso completo a todas las funcionalidades
 
-## 📂 Estructura del Proyecto
+## 📂 Arquitectura del Proyecto
 
-```
-al-grano-bot/
-├── bot/
-│   ├── callbacks/              # Lógica de menús interactivos
-│   │   └── configure_summary_callback.py
-│   ├── commands/               # Comandos del bot
-│   │   ├── start_command.py
-│   │   ├── help_command.py
-│   │   ├── summarize_command.py
-│   │   ├── configure_summary_command.py
-│   │   ├── export_chat_command.py
-│   │   └── message_handler.py
-│   ├── handlers/               # Procesadores de contenido
-│   │   ├── article_handler.py
-│   │   ├── audio_handler.py
-│   │   ├── document_handler.py
-│   │   ├── video_handler.py
-│   │   ├── youtube_handler.py
-│   │   └── error_handler.py
-│   ├── prompts/                # Sistema de prompts modular
-│   │   ├── base_prompts.py
-│   │   └── prompt_modifiers.py
-│   ├── services/               # Lógica de negocio
-│   │   ├── openai_service.py
-│   │   ├── database_service.py
-│   │   ├── message_service.py
-│   │   ├── scheduler_service.py
-│   │   └── daily_summary_service.py
-│   ├── utils/                  # Utilidades
-│   │   ├── constants.py
-│   │   ├── decorators.py
-│   │   ├── format_utils.py
-│   │   ├── logger.py
-│   │   ├── media_utils.py
-│   │   ├── text_utils.py
-│   │   └── get_message_type.py
-│   ├── bot.py                  # Lógica principal del bot
-│   └── config.py               # Gestión de configuración
-├── logs/                       # Archivos de log (generados automáticamente)
-├── .env                        # Variables de entorno (crear manualmente)
-├── environment.yml             # Definición del entorno Conda
-├── main.py                     # Punto de entrada
-└── README.md                   # Este archivo
-```
+Arquitectura modular con servicios singleton y manejo asíncrono:
 
-## 🔧 Características Técnicas Avanzadas
+- **`bot/services/`** - Lógica de negocio (base de datos, IA, programador)
+- **`bot/handlers/`** - Procesadores especializados por tipo de contenido
+- **`bot/commands/`** - Implementaciones de comandos de Telegram
+- **`bot/prompts/`** - Sistema de prompts modular y personalizable
+- **`main.py`** - Punto de entrada con inicialización de servicios
 
-### **Base de Datos**
+> 🏗️ **Desarrolladores**: Ver [CLAUDE.md](CLAUDE.md) para detalles completos de arquitectura y patrones de diseño.
 
-- **SQLite** con operaciones asíncronas
-- **Limpieza automática** de mensajes antiguos
-- **Triggers SQL** para mantenimiento automático
-- **Gestión de esquemas** con migraciones automáticas
+## 🔧 Características Técnicas
 
-### **Sistema de Logging**
-
-- **Logs estructurados** con diferentes niveles
-- **Rotación automática** de archivos
-- **Notificaciones de errores** a administradores
-
-### **Gestión de Memoria**
-
-- **Procesamiento por lotes** para operaciones grandes
-- **Limpieza automática** de archivos temporales
-- **Optimización** para documentos grandes
-
-### **Seguridad**
-
-- **Validación de archivos** por tipo MIME
-- **Límites de tamaño** configurables
-- **Sanitización de inputs** para prevenir inyecciones
+- **Base de datos inteligente**: SQLite con limpieza automática y migraciones
+- **Logging avanzado**: Rotación de archivos y notificaciones de errores
+- **Gestión de memoria**: Optimización para documentos grandes
+- **Seguridad**: Validación de archivos y sanitización de inputs
 
 ## 🤝 Contribuciones
 
@@ -325,24 +242,10 @@ Si Al-Grano Bot te resulta útil y quieres apoyar su desarrollo y mantenimiento:
 - **Arquitectura**: Modular y escalable
 - **Tipo de base de datos**: SQLite con operaciones asíncronas
 
-### 🛠️ Mejoras
+## 🚀 Roadmap
 
-#### 🚧 Sistema de Verificación Inteligente (Mejora Futura)
+**Sistema de Verificación Inteligente** - Pipeline automatizado para fact-checking de afirmaciones en chats con búsqueda web y análisis contextual. 
 
-Integrar un flujo de verificación para comprobar afirmaciones en los chats:
-
-1. **Detección de intención**: identificar mensajes que pidan verificar algo. *Recomendación mínima:* expresiones regulares o modelo ligero.
-2. **Extracción de la afirmación**: obtener la frase a verificar usando el historial. *Recomendación mínima:* mantener un buffer corto de mensajes.
-3. **Reformular la consulta**: convertir la afirmación en una búsqueda web útil. *Recomendación mínima:* plantilla simple o modelo rápido.
-4. **Decidir si buscar**: usar un modelo rápido para determinar si es necesario consultar la web. Paso crítico para ganar velocidad.
-5. **Buscar en la web**: si procede, obtener 2–3 enlaces (p.ej. de DuckDuckGo). *Recomendación mínima:* scraping directo sin API.
-6. **Scraping y limpieza**: extraer solo el texto relevante de cada enlace. *Recomendación mínima:* utilizar `trafilatura`.
-7. **Preparar el contexto**: reunir los textos y la pregunta original.
-8. **Razonar con la IA**: generar la respuesta final con el modelo elegido.
-9. **Responder en Telegram**: enviar la conclusión al usuario, opcionalmente con fuentes.
-
-Este sistema debe funcionar rápidamente y sin depender de APIs de pago.
-
-Consulta [docs/sistema_verificacion_inteligente.md](docs/sistema_verificacion_inteligente.md) para leer la propuesta completa paso a paso.
+> 📋 Ver [docs/sistema_verificacion_inteligente.md](docs/sistema_verificacion_inteligente.md) para la propuesta técnica completa.
 ---
 _¡Obtén tus resúmenes al grano con la potencia de la IA! 🚀_
