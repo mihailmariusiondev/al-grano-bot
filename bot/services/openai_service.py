@@ -1,4 +1,6 @@
 import openai
+import aiohttp
+import json
 from typing import List, Optional, Dict, Literal
 import asyncio
 from bot.utils.text_utils import chunk_text
@@ -38,6 +40,9 @@ class OpenAIService:
     CHARS_PER_TOKEN_ESTIMATE = 3.5
     # Calculate max input characters for the model, used for chunking
     MAX_INPUT_CHARS_MODEL = int(MODEL_MAX_TOKENS * CHARS_PER_TOKEN_ESTIMATE * 0.75)
+    
+    # Store last used model for displaying to user
+    last_used_model = None
 
     def __new__(cls):
         if cls._instance == None:
@@ -55,93 +60,66 @@ class OpenAIService:
                 raise ValueError("OpenRouter API key is required")
             if not openai_api_key:
                 raise ValueError("OpenAI API key (for Whisper) is required")
-            self.openrouter_client = openai.AsyncOpenAI(
-                base_url="https://openrouter.ai/api/v1",
-                api_key=openrouter_api_key
-            )
+            
+            # Only OpenAI client for Whisper
             self.openai_client = openai.AsyncOpenAI(
                 api_key=openai_api_key
             ) # Cliente para API directa de OpenAI (Whisper)
-            self.openrouter_extra_headers = {
-                "HTTP-Referer": openrouter_site_url,
-                "X-Title": openrouter_site_name,
-            }
+            
+            # OpenRouter configuration for direct HTTP calls
+            self.openrouter_api_key = openrouter_api_key
+            self.openrouter_site_url = openrouter_site_url
+            self.openrouter_site_name = openrouter_site_name
             self.logger = logger.get_logger("openai_service")
             self.initialized = True
             self.logger.info(f"OpenAIService initialized. OpenRouter Model: {config.OPENROUTER_MODEL}, Max input chars for chunking: {self.MAX_INPUT_CHARS_MODEL}")
 
-    async def _execute_chat_completion(
+    async def _execute_openrouter_completion(
         self,
-        client: openai.AsyncOpenAI,
-        messages: List[Dict[str, str]],
+        messages: List[Dict[str, str]], 
         model: str,
         temperature: float = 0.7,
-        max_tokens: Optional[int] = None, # For OpenRouter, this is often model-specific or managed by OR.
-                                          # The new primary model's "Max Output Tokens" is not specified (free), fallback is 32K.
-        extra_headers: Optional[Dict[str,str]] = None
+        max_tokens: Optional[int] = None
     ) -> str:
-        if not self.initialized:
-            raise RuntimeError("OpenAI service not initialized")
+        """Direct OpenRouter API call with reasoning control"""
+        url = "https://openrouter.ai/api/v1/chat/completions"
+        headers = {
+            "Authorization": f"Bearer {self.openrouter_api_key}",
+            "Content-Type": "application/json",
+            "HTTP-Referer": self.openrouter_site_url,
+            "X-Title": self.openrouter_site_name,
+        }
+        
+        payload = {
+            "model": model,
+            "messages": messages,
+            "temperature": temperature,
+            "reasoning": {"exclude": True}  # Exclude reasoning tokens
+        }
+        
+        if max_tokens:
+            payload["max_tokens"] = max_tokens
+        
+        self.logger.debug(f"OpenRouter direct API call - Model: {model}, reasoning excluded")
+        
+        async with aiohttp.ClientSession() as session:
+            async with session.post(url, headers=headers, json=payload) as response:
+                if response.status != 200:
+                    error_text = await response.text()
+                    raise RuntimeError(f"OpenRouter API error {response.status}: {error_text}")
+                
+                data = await response.json()
+                content = data["choices"][0]["message"]["content"]
+                
+                # Apply content cleaning as fallback
+                from bot.utils.text_utils import clean_ai_response
+                content = clean_ai_response(content)
+                
+                # Store the successful model
+                self.last_used_model = model
+                
+                return content
 
-        # Calculate approximate token count for logging
-        total_chars = sum(len(msg.get('content', '')) for msg in messages)
-        estimated_tokens = int(total_chars / self.CHARS_PER_TOKEN_ESTIMATE)
-
-        self.logger.debug(f"=== CHAT COMPLETION REQUEST ===")
-        self.logger.debug(f"Model: {model}")
-        self.logger.debug(f"Client: {'OpenRouter' if client == self.openrouter_client else 'OpenAI'}")
-        self.logger.debug(f"Temperature: {temperature}")
-        self.logger.debug(f"Max tokens: {max_tokens}")
-        self.logger.debug(f"Messages count: {len(messages)}")
-        self.logger.debug(f"Total content chars: {total_chars}")
-        self.logger.debug(f"Estimated input tokens: {estimated_tokens}")
-        self.logger.debug(f"System prompt length: {len(messages[0]['content']) if messages and messages[0]['role'] == 'system' else 0}")
-
-        # Log complete message content for debugging
-        self.logger.debug(f"=== COMPLETE MESSAGES PAYLOAD ===")
-        for i, message in enumerate(messages):
-            role = message.get('role', 'unknown')
-            content = message.get('content', '')
-            self.logger.debug(f"Message {i+1} [{role}]: {content}")
-        self.logger.debug(f"=== END MESSAGES PAYLOAD ===")
-
-        # Log extra headers if present
-        if extra_headers:
-            self.logger.debug(f"Extra headers: {extra_headers}")
-
-        try:
-            self.logger.info(f"Sending chat completion request to {model}")
-            response = await client.chat.completions.create(
-                model=model,
-                messages=messages,
-                temperature=temperature,
-                max_tokens=max_tokens,
-                extra_headers=extra_headers if extra_headers else None
-            )
-
-            response_content = response.choices[0].message.content
-            response_length = len(response_content) if response_content else 0
-            estimated_response_tokens = int(response_length / self.CHARS_PER_TOKEN_ESTIMATE)
-
-            self.logger.debug(f"=== CHAT COMPLETION RESPONSE ===")
-            self.logger.debug(f"Response length: {response_length} chars")
-            self.logger.debug(f"Estimated response tokens: {estimated_response_tokens}")
-            self.logger.debug(f"Total estimated tokens used: {estimated_tokens + estimated_response_tokens}")
-
-            # Log complete response content for debugging
-            self.logger.debug(f"=== COMPLETE RESPONSE CONTENT ===")
-            self.logger.debug(f"Response: {response_content}")
-            self.logger.debug(f"=== END RESPONSE CONTENT ===")
-
-            # Log usage info if available
-            if hasattr(response, 'usage') and response.usage:
-                self.logger.info(f"Token usage - Prompt: {response.usage.prompt_tokens}, Completion: {response.usage.completion_tokens}, Total: {response.usage.total_tokens}")
-
-            self.logger.info(f"Chat completion successful with model {model}")
-            return response_content
-        except Exception as e:
-            self.logger.error(f"Chat completion failed for model {model}: {e}", exc_info=True)
-            raise RuntimeError(f"Failed to process chat completion: {str(e)}") from e
 
     async def chat_completion_openrouter(
         self,
@@ -175,13 +153,11 @@ class OpenAIService:
             try:
                 self.logger.info(f"Attempting model {i+1}/{len(models_to_try)}: {current_model}")
                 
-                result = await self._execute_chat_completion(
-                    client=self.openrouter_client,
+                result = await self._execute_openrouter_completion(
                     messages=messages,
                     model=current_model,
                     temperature=temperature,
-                    max_tokens=max_tokens,
-                    extra_headers=self.openrouter_extra_headers
+                    max_tokens=max_tokens
                 )
                 
                 if i > 0:  # Used fallback

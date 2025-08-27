@@ -103,7 +103,13 @@ async def send_long_message(update: Update, text: str) -> None:
     This function maintains backward compatibility with the existing interface
     while leveraging the improved message_service functionality.
     """
+    from bot.services.openai_service import openai_service
+    
     chat_id = update.effective_chat.id
+    
+    # Add model info to the end of the message if available
+    if hasattr(openai_service, 'last_used_model') and openai_service.last_used_model:
+        text = f"{text}\n\n_Generado con {openai_service.last_used_model}_"
 
     # Use the improved message_service with Markdown support
     success = await message_service.send_message(chat_id, text, parse_mode="Markdown")

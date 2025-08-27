@@ -87,7 +87,12 @@ async def generate_daily_summary(chat_id: int) -> str:
         madrid_tz = pytz.timezone("Europe/Madrid")
         yesterday = (datetime.now(madrid_tz) - timedelta(days=1)).strftime("%d/%m/%Y")
 
-        final_summary = f"📅 **Resumen del día {yesterday}**\n\n" f"{summary}"
+        # Add model info if available  
+        model_info = ""
+        if hasattr(openai_service, 'last_used_model') and openai_service.last_used_model:
+            model_info = f"\n\n_Generado con {openai_service.last_used_model}_"
+            
+        final_summary = f"📅 **Resumen del día {yesterday}**\n\n{summary}{model_info}"
 
         return final_summary
     except Exception as e:
@@ -156,7 +161,12 @@ async def send_daily_summary_for(chat_id: int):
         yesterday = (datetime.now(madrid_tz) - timedelta(days=1)).strftime("%d/%m/%Y")
         logger.debug(f"Adding header for date: {yesterday}")
 
-        final_summary = f"📅 **Resumen del día {yesterday}**\n\n{summary}"
+        # Add model info if available
+        model_info = ""
+        if hasattr(openai_service, 'last_used_model') and openai_service.last_used_model:
+            model_info = f"\n\n_Generado con {openai_service.last_used_model}_"
+            
+        final_summary = f"📅 **Resumen del día {yesterday}**\n\n{summary}{model_info}"
         final_length = len(final_summary)
         logger.debug(
             f"Final summary length: {final_length} chars"

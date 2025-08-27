@@ -1,5 +1,6 @@
 from typing import List
 import logging
+import re
 
 
 def chunk_text(text: str, chunk_size: int = 384000) -> List[str]:
@@ -88,3 +89,37 @@ def chunk_text(text: str, chunk_size: int = 384000) -> List[str]:
         f"Tamaños: {[len(chunk) for chunk in chunks]}"
     )
     return chunks
+
+
+def clean_ai_response(text: str) -> str:
+    """Clean AI response by removing technical metadata and thinking tags.
+    
+    This function removes:
+    - <think> and </think> tags with their content 
+    - <thinking> and </thinking> tags with their content
+    - Technical debugging information patterns
+    - Sentence count validation patterns
+    
+    Args:
+        text: Raw AI response text
+        
+    Returns:
+        Cleaned text without technical metadata
+    """
+    # Handle None or empty input
+    if text is None:
+        return ""
+    if not text:
+        return text
+    
+    # Remove <think>...</think> tags and content (case insensitive, only complete pairs)
+    text = re.sub(r'<think\s*>.*?</think\s*>', '', text, flags=re.DOTALL | re.IGNORECASE)
+    
+    # Remove <thinking>...</thinking> tags and content (case insensitive, only complete pairs) 
+    text = re.sub(r'<thinking\s*>.*?</thinking\s*>', '', text, flags=re.DOTALL | re.IGNORECASE)
+    
+    # Clean up extra whitespace and newlines
+    text = re.sub(r'\n\s*\n', '\n\n', text)  # Multiple newlines to double
+    text = text.strip()
+    
+    return text

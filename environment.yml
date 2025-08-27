@@ -11,6 +11,7 @@ dependencies:
       - python-dotenv
       - openai
       - aiosqlite
+      - aiohttp
       - youtube-transcript-api
       - python-readability
       - python-docx
