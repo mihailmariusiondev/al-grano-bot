@@ -115,16 +115,19 @@ async def notify_admins_warning(
         notification_message = "\n".join(notification_parts)
         
         # Send to all admins (only first admin for warnings to avoid spam)
-        admin_id = admin_users[0]
-        try:
-            await context.bot.send_message(
-                chat_id=admin_id,
-                text=notification_message, 
-                parse_mode="Markdown"
-            )
-            logger_instance.info(f"Warning notification sent to admin {admin_id}")
-        except Exception as send_error:
-            logger_instance.error(f"Failed to send warning to admin {admin_id}: {send_error}")
+        if admin_users:
+            admin_id = admin_users[0]
+            try:
+                await context.bot.send_message(
+                    chat_id=admin_id,
+                    text=notification_message, 
+                    parse_mode="Markdown"
+                )
+                logger_instance.info(f"Warning notification sent to admin {admin_id}")
+            except Exception as send_error:
+                logger_instance.error(f"Failed to send warning to admin {admin_id}: {send_error}")
+        else:
+            logger_instance.warning("No admin users available for warning notification")
             
     except Exception as notification_error:
         logger_instance.error(f"Failure in admin warning notification: {notification_error}")
